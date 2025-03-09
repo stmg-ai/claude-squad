@@ -9,7 +9,9 @@ import (
 	"log"
 	"os"
 	"os/exec"
-
+	"os/signal"
+	"syscall"
+	
 	"sync"
 	"time"
 )
@@ -18,7 +20,7 @@ func main() {
 	tmuxMain()
 }
 
-type stdinLisenter struct {
+type stdinListener struct {
 	mu struct {
 		*sync.Mutex
 		buf bytes.Buffer
@@ -27,8 +29,8 @@ type stdinLisenter struct {
 
 // copies stdin continuously into itself. then, it exposes a Read method for processes to read. this
 // lets us intercept the stdin to detect keystrokes.
-func newStdinListener() *stdinLisenter {
-	listener := &stdinLisenter{}
+func newStdinListener() *stdinListener {
+	listener := &stdinListener{}
 	listener.mu.Mutex = &sync.Mutex{}
 	go func() {
 		if _, err := io.Copy(listener, os.Stdin); err != nil {
@@ -38,13 +40,28 @@ func newStdinListener() *stdinLisenter {
 	return listener
 }
 
-func (sl *stdinLisenter) Write(p []byte) (n int, err error) {
+// updateWindowSize updates the window size of the PTY based on the current terminal dimensions
+func updateWindowSize(ptmx *os.File) error {
+	cols, rows, err := term.GetSize(int(os.Stdin.Fd()))
+	if err != nil {
+		return err
+	}
+
+	return pty.Setsize(ptmx, &pty.Winsize{
+		Rows: uint16(rows),
+		Cols: uint16(cols),
+		X:    0,
+		Y:    0,
+	})
+}
+
+func (sl *stdinListener) Write(p []byte) (n int, err error) {
 	sl.mu.Lock()
 	defer sl.mu.Unlock()
 	return sl.mu.buf.Write(p)
 }
 
-func (sl *stdinLisenter) Read(p []byte) (n int, err error) {
+func (sl *stdinListener) Read(p []byte) (n int, err error) {
 	sl.mu.Lock()
 	defer sl.mu.Unlock()
 	return sl.mu.buf.Read(p)
@@ -60,6 +77,41 @@ func tmuxMain() {
 		log.Fatalf("Error starting tmux with pty: %v", err)
 	}
 	defer ptmx.Close()
+
+	// Update the window size of the PTY
+	if err := updateWindowSize(ptmx); err != nil {
+		log.Fatalf("Error updating window size: %v", err)
+	}
+
+	// Handle window resize events
+	winch := make(chan os.Signal, 1)
+	signal.Notify(winch, syscall.SIGWINCH)
+	go func() {
+		// Send initial SIGWINCH to trigger the first resize
+		syscall.Kill(syscall.Getpid(), syscall.SIGWINCH)
+
+		// Create a debounced channel for resize events
+		debouncedWinch := make(chan os.Signal)
+		go func() {
+			var resizeTimer *time.Timer
+			for range winch {
+				if resizeTimer != nil {
+					resizeTimer.Stop()
+				}
+				resizeTimer = time.AfterFunc(50*time.Millisecond, func() {
+					debouncedWinch <- syscall.SIGWINCH
+				})
+			}
+		}()
+
+		// Handle the debounced resize events
+		for range debouncedWinch {
+			if err := updateWindowSize(ptmx); err != nil {
+				log.Printf("failed to update window size: %v", err)
+			}
+		}
+	}()
+	defer signal.Stop(winch)
 
 	time.Sleep(1 * time.Second)
 
