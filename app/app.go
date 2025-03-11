@@ -1,12 +1,14 @@
-package main
+package app
 
 import (
+	"claude-squad/keys"
 	"claude-squad/ui"
 	"fmt"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"os"
+	"strings"
 )
 
 // Run is the main entrypoint into the application.
@@ -18,14 +20,27 @@ func Run() {
 	}
 }
 
+type state int
+
+const (
+	stateDefault state = iota
+	// stateNew is the state when the user is creating a new instance.
+	stateNew
+)
+
 type home struct {
 	spinner  spinner.Model
 	quitting bool
 	err      error
-	menu     *ui.Menu
 
+	// ui components
+	menu *ui.Menu
+	list *ui.List
+
+	// state
 	windowWidth  int
 	windowHeight int
+	state        state
 }
 
 func newHome() *home {
@@ -36,6 +51,7 @@ func newHome() *home {
 	return &home{
 		spinner: s,
 		menu:    ui.NewMenu(),
+		list:    ui.NewList(),
 	}
 }
 
@@ -66,12 +82,12 @@ func (m *home) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *home) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	name, ok := ui.GlobalKeyStringsMap[msg.String()]
+	name, ok := keys.GlobalKeyStringsMap[msg.String()]
 	if !ok {
 		return m, nil
 	}
 	switch name {
-	case ui.Quit:
+	case keys.KeyQuit:
 		m.quitting = true
 		return m, tea.Quit
 
@@ -89,11 +105,15 @@ func (m *home) View() string {
 	//if m.quitting {
 	//	return str + "\n"
 	//}
-	//var s strings.Builder
-	//
 
 	// 0.1 means 10% from the bottom
-	block := lipgloss.Place(m.windowWidth, m.windowHeight, lipgloss.Center, 0.1, m.menu.String())
 
-	return block
+	var s strings.Builder
+	//s.WriteString(lipgloss.Place(m.windowWidth, m.windowHeight, lipgloss.Center, 0.1, m.list.String()))
+	//s.WriteString(lipgloss.Place(m.windowWidth, m.windowHeight, lipgloss.Center, 0.1, m.menu.String()))
+	//lipgloss.JoinHorizontal()
+	lipgloss.JoinVertical()
+	s.WriteString(lipgloss.Place(m.windowWidth, m.windowHeight, lipgloss.Center, 0.1, fmt.Sprintf("%d %d", m.windowHeight, m.windowWidth)))
+
+	return s.String()
 }

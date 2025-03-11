@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"claude-squad/app"
 	"fmt"
 	"github.com/creack/pty"
 	"golang.org/x/term"
@@ -17,7 +18,8 @@ import (
 )
 
 func main() {
-	tmuxMain()
+	app.Run()
+	//tmuxMain()
 }
 
 type stdinListener struct {

@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"claude-squad/keys"
 	"github.com/charmbracelet/lipgloss"
 	"strings"
 )
@@ -27,20 +28,20 @@ var menuStyle = lipgloss.NewStyle().
 
 type Menu struct {
 	style   lipgloss.Style
-	options []keyName
+	options []keys.KeyName
 }
 
 func NewMenu() *Menu {
 	return &Menu{
 		style:   menuStyle,
-		options: []keyName{Newt, Kill, Enter, Review, Quit},
+		options: []keys.KeyName{keys.KeyNew, keys.KeyKill, keys.KeyEnter, keys.KeyReview, keys.KeyQuit},
 	}
 }
 
 func (m *Menu) String() string {
 	var s strings.Builder
 	for i, k := range m.options {
-		binding := GlobalkeyBindings[k]
+		binding := keys.GlobalkeyBindings[k]
 		s.WriteString(keyStyle.Render(binding.Help().Key))
 		s.WriteString(" ")
 		s.WriteString(descStyle.Render(binding.Help().Desc))
