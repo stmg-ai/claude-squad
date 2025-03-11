@@ -27,15 +27,20 @@ var menuStyle = lipgloss.NewStyle().
 	Foreground(lipgloss.Color("205"))
 
 type Menu struct {
-	style   lipgloss.Style
-	options []keys.KeyName
+	options       []keys.KeyName
+	height, width int
 }
 
 func NewMenu() *Menu {
 	return &Menu{
-		style:   menuStyle,
 		options: []keys.KeyName{keys.KeyNew, keys.KeyKill, keys.KeyEnter, keys.KeyReview, keys.KeyQuit},
 	}
+}
+
+// SetSize sets the width of the window. The menu will be centered horizontally within this width.
+func (m *Menu) SetSize(width, height int) {
+	m.width = width
+	m.height = height
 }
 
 func (m *Menu) String() string {
@@ -49,5 +54,9 @@ func (m *Menu) String() string {
 			s.WriteString(sepStyle.Render(separator))
 		}
 	}
-	return m.style.Render(s.String())
+
+	// Hardcode a padding of 24 chars. We can't use len(s.String()) because any string output
+	// by Render will have special chars which make the length longer than the number of chars.
+	centeredMenuText := menuStyle.Render(s.String())
+	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, centeredMenuText)
 }

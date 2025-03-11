@@ -23,6 +23,7 @@ var GlobalKeyStringsMap = map[string]KeyName{
 	"down":  KeyDown,
 	"j":     KeyDown,
 	"enter": KeyEnter,
+	"o":     KeyEnter,
 	"n":     KeyNew,
 	"d":     KeyKill,
 	"q":     KeyQuit,
@@ -40,8 +41,8 @@ var GlobalkeyBindings = map[KeyName]key.Binding{
 		key.WithHelp("↓/j", "down"),
 	),
 	KeyEnter: key.NewBinding(
-		key.WithKeys("enter"),
-		key.WithHelp("↵/enter", "open"),
+		key.WithKeys("enter", "o"),
+		key.WithHelp("o", "open"),
 	),
 	KeyNew: key.NewBinding(
 		key.WithKeys("n"),
