@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"claude-squad/app"
+	"context"
 	"fmt"
 	"github.com/creack/pty"
 	"golang.org/x/term"
@@ -17,8 +19,9 @@ import (
 )
 
 func main() {
-	//app.Run()
-	tmuxMain()
+	ctx := context.Background()
+	app.Run(ctx)
+	//tmuxMain()
 }
 
 type stdinListener struct {

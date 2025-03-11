@@ -55,8 +55,6 @@ func (m *Menu) String() string {
 		}
 	}
 
-	// Hardcode a padding of 24 chars. We can't use len(s.String()) because any string output
-	// by Render will have special chars which make the length longer than the number of chars.
 	centeredMenuText := menuStyle.Render(s.String())
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, centeredMenuText)
 }

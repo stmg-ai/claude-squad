@@ -3,16 +3,20 @@ package app
 import (
 	"claude-squad/keys"
 	"claude-squad/ui"
+	"context"
 	"fmt"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"os"
+	"time"
 )
 
+const GlobalInstanceLimit = 16
+
 // Run is the main entrypoint into the application.
-func Run() {
-	p := tea.NewProgram(newHome(), tea.WithAltScreen())
+func Run(ctx context.Context) {
+	p := tea.NewProgram(newHome(ctx), tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -28,6 +32,8 @@ const (
 )
 
 type home struct {
+	ctx context.Context
+
 	spinner  spinner.Model
 	quitting bool
 	err      error
@@ -36,6 +42,7 @@ type home struct {
 	list    *ui.List
 	preview *ui.PreviewPane
 	menu    *ui.Menu
+	errBox  *ui.ErrBox
 
 	// input
 	inputDisabled bool
@@ -46,14 +53,16 @@ type home struct {
 	state        state
 }
 
-func newHome() *home {
+func newHome(ctx context.Context) *home {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
 	return &home{
+		ctx:     ctx,
 		spinner: s,
 		menu:    ui.NewMenu(),
+		errBox:  ui.NewErrBox(),
 		list:    ui.NewList(),
 		preview: ui.NewPreviewPane(0, 0),
 	}
@@ -75,6 +84,8 @@ func (m *home) Init() tea.Cmd {
 
 func (m *home) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case hideErrMsg:
+		m.errBox.Clear()
 	case tea.KeyMsg:
 		return m.handleKeyPress(msg)
 	case ui.ErrMsg:
@@ -89,6 +100,7 @@ func (m *home) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.spinner, cmd = m.spinner.Update(msg)
 		return m, cmd
 	}
+	return m, nil
 }
 
 func (m *home) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -106,12 +118,41 @@ func (m *home) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case keys.KeyDown:
 		m.list.Down()
 		return m, nil
+	case keys.KeyKill:
+		m.list.Kill()
+		return m, nil
 	case keys.KeyUp:
 		m.list.Up()
+		return m, nil
+	case keys.KeyNew:
+		if m.list.NumInstances() >= GlobalInstanceLimit {
+			return m.showErrorMessageForShortTime(
+				fmt.Errorf("you can't create more than %d instances", GlobalInstanceLimit))
+		}
 		return m, nil
 		// TODO: add more key bindings
 	default:
 		return m, nil
+	}
+	return m, nil
+}
+
+// hideErrMsg implements tea.Msg and clears the error text from the screen.
+type hideErrMsg struct{}
+
+// showErrorMessageForShortTime sets the error message. We return a callback. I assume bubbletea calls the
+// callback in a goroutine because it says that tea.Msg / tea.Cmd should be used for IO operations. These
+// tend to block... Eventually, the callback returns a message which is sent back to the Update function.
+// Then, we clear the error.
+func (m *home) showErrorMessageForShortTime(err error) (tea.Model, tea.Cmd) {
+	m.errBox.SetError(err)
+	return m, func() tea.Msg {
+		select {
+		case <-m.ctx.Done():
+		case <-time.After(3 * time.Second):
+		}
+
+		return hideErrMsg{}
 	}
 }
 
@@ -131,9 +172,13 @@ func (m *home) View() string {
 	//s.WriteString(lipgloss.Place(m.windowWidth, m.windowHeight, lipgloss.Center, 0.1, m.menu.String()))
 	//lipgloss.JoinHorizontal()
 	listAndPreview := lipgloss.JoinHorizontal(lipgloss.Top, m.list.String(), m.preview.String())
-	menu := m.menu.String()
 
-	return lipgloss.JoinVertical(lipgloss.Center, listAndPreview, menu)
+	return lipgloss.JoinVertical(
+		lipgloss.Center,
+		listAndPreview,
+		m.menu.String(),
+		m.errBox.String(),
+	)
 
 	//return m.header.String() + listAndPreview + menu
 	//s.WriteString(lipgloss.Place(m.windowWidth, m.windowHeight, lipgloss.Center, 0.1, fmt.Sprintf("%d %d", m.windowHeight, m.windowWidth)))
