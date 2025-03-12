@@ -7,6 +7,11 @@ import (
 	"strings"
 )
 
+const readyIcon = "●"
+
+var readyStyle = lipgloss.NewStyle().
+	Foreground(lipgloss.AdaptiveColor{Light: "#51bd73", Dark: "#51bd73"})
+
 var titleStyle = lipgloss.NewStyle().
 	Foreground(lipgloss.AdaptiveColor{Light: "#1a1a1a", Dark: "#dddddd"})
 
@@ -26,8 +31,11 @@ var mainTitle = lipgloss.NewStyle().
 type Status int
 
 const (
+	// Running is the status when the instance is running and claude is working.
 	Running Status = iota
+	// Ready is if the claude instance is ready to be interacted with (waiting for user input).
 	Ready
+	// Loading is if the instance is loading (if we are starting it up or something).
 	Loading
 )
 
@@ -52,8 +60,8 @@ func NewList(spinner *spinner.Model) *List {
 	return &List{
 		items: []*Instance{
 			{title: "asdf", path: "../blah", status: Running},
-			{title: "banana", path: "../blah", status: Running},
-			{title: "apple banana", path: "../blah", status: Running},
+			{title: "banana", path: "../blah", status: Ready},
+			{title: "apple banana", path: "../blah", status: Loading},
 			{title: "peach apple", path: "../blah", status: Running},
 			{title: "peach banana", path: "../blah", status: Running},
 			{title: "test 6", path: "../blah", status: Running},
@@ -61,12 +69,6 @@ func NewList(spinner *spinner.Model) *List {
 			{title: "banana", path: "../blah", status: Loading},
 			{title: "apple banana", path: "../blah", status: Ready},
 			{title: "peach apple", path: "../blah", status: Loading},
-			//{title: "peach banana", path: "../blah", status: Running},
-			//{title: "test 6", path: "../blah", status: Running},
-			//{title: "asdf", path: "../blah", status: Running},
-			//{title: "banana", path: "../blah", status: Running},
-			//{title: "apple banana", path: "../blah", status: Running},
-			//{title: "peach apple", path: "../blah", status: Running},
 		},
 		spinner: spinner,
 	}
@@ -94,14 +96,21 @@ func (i *Instance) Render(idx int, selected bool, spinner *spinner.Model) string
 	title := titleS.Render(fmt.Sprintf("%s %s", prefix, i.title))
 
 	// add spinner next to title if it's running
-	if i.status == Running {
-		title = lipgloss.JoinHorizontal(
-			lipgloss.Left,
-			title,
-			" ",
-			spinner.View(),
-		)
+	var join string
+	switch i.status {
+	case Running:
+		join = spinner.View()
+	case Ready:
+		join = readyStyle.Render(readyIcon)
+	default:
+
 	}
+	title = lipgloss.JoinHorizontal(
+		lipgloss.Left,
+		title,
+		" ",
+		join,
+	)
 
 	// join title and subtitle
 	text := lipgloss.JoinVertical(
