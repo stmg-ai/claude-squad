@@ -41,6 +41,7 @@ type home struct {
 	preview *ui.PreviewPane
 	menu    *ui.Menu
 	errBox  *ui.ErrBox
+	// global spinner instance. we plumb this down to where it's needed
 	spinner spinner.Model
 
 	// input
@@ -78,6 +79,8 @@ func (m *home) updateHandleWindowSizeEvent(msg tea.WindowSizeMsg) {
 }
 
 func (m *home) Init() tea.Cmd {
+	// Upon starting, we want to start the spinner. Whenever we get a spinner.TickMsg, we
+	// update the spinner, which sends a new spinner.TickMsg. I think this lasts forever lol.
 	return m.spinner.Tick
 }
 
@@ -94,10 +97,6 @@ func (m *home) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.spinner, cmd = m.spinner.Update(msg)
 		return m, cmd
-		//default:
-		//	var cmd tea.Cmd
-		//	m.spinner, cmd = m.spinner.Update(msg)
-		//	return m, cmd
 	}
 	return m, nil
 }
