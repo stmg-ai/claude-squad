@@ -5,11 +5,12 @@ import (
 	"claude-squad/ui"
 	"context"
 	"fmt"
+	"os"
+	"time"
+
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"os"
-	"time"
 )
 
 const GlobalInstanceLimit = 10

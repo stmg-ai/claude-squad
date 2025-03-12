@@ -9,6 +9,12 @@ type ErrBox struct {
 	err           error
 }
 
+var errStyle = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{
+	Light: "#FF0000",
+	Dark:  "#FF0000",
+})
+
+
 func NewErrBox() *ErrBox {
 	return &ErrBox{}
 }
@@ -31,5 +37,5 @@ func (e *ErrBox) String() string {
 	if e.err != nil {
 		err = e.err.Error()
 	}
-	return lipgloss.Place(e.width, e.height, lipgloss.Center, lipgloss.Center, descStyle.Render(err))
+	return lipgloss.Place(e.width, e.height, lipgloss.Center, lipgloss.Center, errStyle.Render(err))
 }
