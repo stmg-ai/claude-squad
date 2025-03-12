@@ -43,7 +43,9 @@ type List struct {
 	items         []*Instance
 	selectedIdx   int
 	height, width int
-	spinner       *spinner.Model
+
+	// global spinner which is always spinning. we can choose to render it or not
+	spinner *spinner.Model
 }
 
 func NewList(spinner *spinner.Model) *List {
@@ -89,15 +91,19 @@ func (i *Instance) Render(idx int, selected bool, spinner *spinner.Model) string
 		descS = listDescStyle
 	}
 
-	title := titleS.Render(fmt.Sprintf("%s %s ", prefix, i.title))
+	title := titleS.Render(fmt.Sprintf("%s %s", prefix, i.title))
 
+	// add spinner next to title if it's running
 	if i.status == Running {
 		title = lipgloss.JoinHorizontal(
 			lipgloss.Left,
 			title,
+			" ",
 			spinner.View(),
 		)
 	}
+
+	// join title and subtitle
 	text := lipgloss.JoinVertical(
 		lipgloss.Left,
 		title,
