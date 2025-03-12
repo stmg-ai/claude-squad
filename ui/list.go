@@ -147,7 +147,9 @@ func (l *List) Down() {
 	if len(l.items) == 0 {
 		return
 	}
-	l.selectedIdx = (l.selectedIdx + 1) % len(l.items)
+	if l.selectedIdx < len(l.items)-1 {
+		l.selectedIdx++
+	}
 }
 
 // Kill selects the next item in the list.
@@ -168,10 +170,7 @@ func (l *List) Up() {
 	if len(l.items) == 0 {
 		return
 	}
-
-	if l.selectedIdx == 0 {
-		l.selectedIdx = len(l.items) - 1
-		return
+	if l.selectedIdx > 0 {
+		l.selectedIdx--
 	}
-	l.selectedIdx = l.selectedIdx - 1
 }
