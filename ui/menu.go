@@ -7,13 +7,13 @@ import (
 )
 
 var keyStyle = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{
-	Light: "#909090",
-	Dark:  "#626262",
+	Light: "#655F5F",
+	Dark:  "#7F7A7A",
 })
 
 var descStyle = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{
-	Light: "#B2B2B2",
-	Dark:  "#4A4A4A",
+	Light: "#7A7474",
+	Dark:  "#9C9494",
 })
 
 var sepStyle = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{
