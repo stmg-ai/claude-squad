@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/lipgloss"
 	"strings"
 )
@@ -9,16 +10,18 @@ import (
 var titleStyle = lipgloss.NewStyle().
 	Foreground(lipgloss.AdaptiveColor{Light: "#1a1a1a", Dark: "#dddddd"})
 
-var selectedStyle = lipgloss.NewStyle().
+var listDescStyle = titleStyle.Foreground(lipgloss.AdaptiveColor{Light: "#A49FA5", Dark: "#777777"})
+
+var selectedTitleStyle = lipgloss.NewStyle().
 	Border(lipgloss.NormalBorder(), false, false, false, true).
 	BorderForeground(lipgloss.AdaptiveColor{Light: "#F793FF", Dark: "#AD58B4"}).
 	Foreground(lipgloss.AdaptiveColor{Light: "#EE6FF8", Dark: "#EE6FF8"})
 
+var selectedDescStyle = selectedTitleStyle.Foreground(lipgloss.AdaptiveColor{Light: "#F793FF", Dark: "#AD58B4"})
+
 var mainTitle = lipgloss.NewStyle().
 	Background(lipgloss.Color("62")).
 	Foreground(lipgloss.Color("230"))
-
-const GlobalInstanceLimit = 16
 
 type Status int
 
@@ -30,6 +33,7 @@ const (
 
 type Instance struct {
 	title  string
+	path   string // workspace path?
 	status Status
 	height int
 	width  int
@@ -39,28 +43,30 @@ type List struct {
 	items         []*Instance
 	selectedIdx   int
 	height, width int
+	spinner       *spinner.Model
 }
 
-func NewList() *List {
+func NewList(spinner *spinner.Model) *List {
 	return &List{
 		items: []*Instance{
-			{title: "asdf", status: Running},
-			{title: "banana", status: Running},
-			{title: "apple banana", status: Running},
-			{title: "peach apple", status: Running},
-			{title: "peach banana", status: Running},
-			{title: "test 6", status: Running},
-			{title: "asdf", status: Running},
-			{title: "banana", status: Running},
-			{title: "apple banana", status: Running},
-			{title: "peach apple", status: Running},
-			{title: "peach banana", status: Running},
-			{title: "test 6", status: Running},
-			{title: "asdf", status: Running},
-			{title: "banana", status: Running},
-			{title: "apple banana", status: Running},
-			{title: "peach apple", status: Running},
+			{title: "asdf", path: "../blah", status: Running},
+			{title: "banana", path: "../blah", status: Running},
+			{title: "apple banana", path: "../blah", status: Running},
+			{title: "peach apple", path: "../blah", status: Running},
+			{title: "peach banana", path: "../blah", status: Running},
+			{title: "test 6", path: "../blah", status: Running},
+			{title: "asdf", path: "../blah", status: Ready},
+			{title: "banana", path: "../blah", status: Loading},
+			{title: "apple banana", path: "../blah", status: Ready},
+			{title: "peach apple", path: "../blah", status: Loading},
+			//{title: "peach banana", path: "../blah", status: Running},
+			//{title: "test 6", path: "../blah", status: Running},
+			//{title: "asdf", path: "../blah", status: Running},
+			//{title: "banana", path: "../blah", status: Running},
+			//{title: "apple banana", path: "../blah", status: Running},
+			//{title: "peach apple", path: "../blah", status: Running},
 		},
+		spinner: spinner,
 	}
 }
 
@@ -74,11 +80,32 @@ func (l *List) NumInstances() int {
 	return len(l.items)
 }
 
-func (l *List) RenderInstance(idx int, selected bool, text string) string {
-	if selected {
-		return selectedStyle.Render(fmt.Sprintf(" %d. %s ", idx, text))
+func (i *Instance) Render(idx int, selected bool, spinner *spinner.Model) string {
+	prefix := fmt.Sprintf(" %d. ", idx)
+	titleS := selectedTitleStyle
+	descS := selectedDescStyle
+	if !selected {
+		titleS = titleStyle
+		descS = listDescStyle
 	}
-	return titleStyle.Render(fmt.Sprintf(" %d. %s ", idx, text))
+
+	title := titleS.Render(fmt.Sprintf("%s %s ", prefix, i.title))
+
+	if i.status == Running {
+		title = lipgloss.JoinHorizontal(
+			lipgloss.Left,
+			title,
+			spinner.View(),
+		)
+	}
+	text := lipgloss.JoinVertical(
+		lipgloss.Left,
+		title,
+		descS.Render(fmt.Sprintf("%s %s", strings.Repeat(" ", len(prefix)), i.path)),
+	)
+
+	return text
+
 }
 
 func (l *List) String() string {
@@ -92,7 +119,7 @@ func (l *List) String() string {
 
 	// Render the list.
 	for i, item := range l.items {
-		b.WriteString(l.RenderInstance(i+1, i == l.selectedIdx, item.title))
+		b.WriteString(item.Render(i+1, i == l.selectedIdx, l.spinner))
 		if i != len(l.items)-1 {
 			b.WriteString("\n\n")
 		}

@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-const GlobalInstanceLimit = 16
+const GlobalInstanceLimit = 10
 
 // Run is the main entrypoint into the application.
 func Run(ctx context.Context) {
@@ -34,15 +34,14 @@ const (
 type home struct {
 	ctx context.Context
 
-	spinner  spinner.Model
 	quitting bool
-	err      error
 
 	// ui components
 	list    *ui.List
 	preview *ui.PreviewPane
 	menu    *ui.Menu
 	errBox  *ui.ErrBox
+	spinner spinner.Model
 
 	// input
 	inputDisabled bool
@@ -57,15 +56,15 @@ func newHome(ctx context.Context) *home {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
-
-	return &home{
+	h := &home{
 		ctx:     ctx,
-		spinner: s,
+		spinner: spinner.New(spinner.WithSpinner(spinner.MiniDot)),
 		menu:    ui.NewMenu(),
 		errBox:  ui.NewErrBox(),
-		list:    ui.NewList(),
 		preview: ui.NewPreviewPane(0, 0),
 	}
+	h.list = ui.NewList(&h.spinner)
+	return h
 }
 
 // updateHandleWindowSizeEvent is really important since it sets the sizes of the components.
@@ -88,17 +87,17 @@ func (m *home) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.errBox.Clear()
 	case tea.KeyMsg:
 		return m.handleKeyPress(msg)
-	case ui.ErrMsg:
-		m.err = msg
-		return m, nil
-
 	case tea.WindowSizeMsg:
 		m.updateHandleWindowSizeEvent(msg)
 		return m, nil
-	default:
+	case spinner.TickMsg:
 		var cmd tea.Cmd
 		m.spinner, cmd = m.spinner.Update(msg)
 		return m, cmd
+		//default:
+		//	var cmd tea.Cmd
+		//	m.spinner, cmd = m.spinner.Update(msg)
+		//	return m, cmd
 	}
 	return m, nil
 }
