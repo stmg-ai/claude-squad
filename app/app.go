@@ -119,7 +119,7 @@ func (m *home) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case keys.KeyKill:
 		m.list.Kill()
-		return m, nil
+		return m, tea.WindowSize()
 	case keys.KeyUp:
 		m.list.Up()
 		return m, nil
@@ -129,7 +129,11 @@ func (m *home) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				fmt.Errorf("you can't create more than %d instances", GlobalInstanceLimit))
 		}
 		return m, nil
-		// TODO: add more key bindings
+	// TODO: add more key bindings
+	case keys.KeyEnter:
+		<-m.list.Attach()
+		// WindowSize clears the screen.
+		return m, tea.WindowSize()
 	default:
 		return m, nil
 	}
@@ -156,20 +160,6 @@ func (m *home) showErrorMessageForShortTime(err error) (tea.Model, tea.Cmd) {
 }
 
 func (m *home) View() string {
-	//if m.err != nil {
-	//	return m.err.Error()
-	//}
-	//str := fmt.Sprintf("\n\n   %s Loading forever...press q to quit\n\n", m.spinner.View())
-	//if m.quitting {
-	//	return str + "\n"
-	//
-
-	// 0.1 means 10% from the bottom
-
-	//var s strings.Builder
-	//s.WriteString(lipgloss.Place(m.windowWidth, m.windowHeight, lipgloss.Center, 0.1, m.list.String()))
-	//s.WriteString(lipgloss.Place(m.windowWidth, m.windowHeight, lipgloss.Center, 0.1, m.menu.String()))
-	//lipgloss.JoinHorizontal()
 	listAndPreview := lipgloss.JoinHorizontal(lipgloss.Top, m.list.String(), m.preview.String())
 
 	return lipgloss.JoinVertical(
@@ -178,9 +168,4 @@ func (m *home) View() string {
 		m.menu.String(),
 		m.errBox.String(),
 	)
-
-	//return m.header.String() + listAndPreview + menu
-	//s.WriteString(lipgloss.Place(m.windowWidth, m.windowHeight, lipgloss.Center, 0.1, fmt.Sprintf("%d %d", m.windowHeight, m.windowWidth)))
-
-	//return s.String()
 }

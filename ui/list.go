@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"claude-squad/tmux"
 	"fmt"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/lipgloss"
@@ -45,6 +46,8 @@ type Instance struct {
 	status Status
 	height int
 	width  int
+
+	tmux *tmux.Session
 }
 
 type List struct {
@@ -59,16 +62,16 @@ type List struct {
 func NewList(spinner *spinner.Model) *List {
 	return &List{
 		items: []*Instance{
-			{title: "asdf", path: "../blah", status: Running},
-			{title: "banana", path: "../blah", status: Ready},
-			{title: "apple banana", path: "../blah", status: Loading},
-			{title: "peach apple", path: "../blah", status: Running},
-			{title: "peach banana", path: "../blah", status: Running},
-			{title: "test 6", path: "../blah", status: Running},
-			{title: "asdf", path: "../blah", status: Ready},
-			{title: "banana", path: "../blah", status: Loading},
-			{title: "apple banana", path: "../blah", status: Ready},
-			{title: "peach apple", path: "../blah", status: Loading},
+			{title: "asdf", path: "../blah", status: Running, tmux: tmux.NewTmuxSession("a")},
+			{title: "banana", path: "../blah", status: Ready, tmux: tmux.NewTmuxSession("b")},
+			{title: "apple banana", path: "../blah", status: Loading, tmux: tmux.NewTmuxSession("c")},
+			{title: "peach apple", path: "../blah", status: Running, tmux: tmux.NewTmuxSession("d")},
+			//{title: "peach banana", path: "../blah", status: Running, tmux: tmux.NewTmuxSession(context.Background())},
+			//{title: "test 6", path: "../blah", status: Running, tmux: tmux.NewTmuxSession(context.Background())},
+			//{title: "asdf", path: "../blah", status: Ready, tmux: tmux.NewTmuxSession(context.Background())},
+			//{title: "banana", path: "../blah", status: Loading, tmux: tmux.NewTmuxSession(context.Background())},
+			//{title: "apple banana", path: "../blah", status: Ready, tmux: tmux.NewTmuxSession(context.Background())},
+			//{title: "peach apple", path: "../blah", status: Loading, tmux: tmux.NewTmuxSession(context.Background())},
 		},
 		spinner: spinner,
 	}
@@ -157,12 +160,21 @@ func (l *List) Kill() {
 	if len(l.items) == 0 {
 		return
 	}
+	targetInstance := l.items[l.selectedIdx]
 	// If you delete the last one in the list, select the previous one.
 	if l.selectedIdx == len(l.items)-1 {
 		defer l.Up()
 	}
 	// Since there's items after this, the selectedIdx can stay the same.
 	l.items = append(l.items[:l.selectedIdx], l.items[l.selectedIdx+1:]...)
+
+	// Blocks until the goroutine stop
+	targetInstance.tmux.Close()
+}
+
+func (l *List) Attach() chan struct{} {
+	targetInstance := l.items[l.selectedIdx]
+	return targetInstance.tmux.Attach()
 }
 
 // Up selects the prev item in the list.
