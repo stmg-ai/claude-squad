@@ -157,4 +157,4 @@ func (s *Storage) DeleteAllInstances() error {
 	}
 
 	return nil
-} 
+}

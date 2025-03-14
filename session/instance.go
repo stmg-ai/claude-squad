@@ -44,8 +44,8 @@ func (i *Instance) ToInstanceData() InstanceData {
 // FromInstanceData creates a new Instance from serialized data
 func FromInstanceData(data InstanceData) (*Instance, error) {
 	instance, err := NewInstance(InstanceOptions{
-		Title:             data.Title,
-		Path:              data.Path,
+		Title:              data.Title,
+		Path:               data.Path,
 		RestoreFromStorage: true,
 	})
 	if err != nil {
@@ -77,7 +77,7 @@ func NewInstance(opts InstanceOptions) (*Instance, error) {
 	}
 
 	tmuxSession := NewTmuxSession(opts.Title)
-	
+
 	// If restoring from storage, create instance without tmux operations
 	if opts.RestoreFromStorage {
 		now := time.Now()

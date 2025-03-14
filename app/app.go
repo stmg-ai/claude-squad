@@ -62,7 +62,7 @@ func newHome(ctx context.Context) *home {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
-	
+
 	// Initialize storage
 	storage, err := session.NewStorage()
 	if err != nil {
@@ -180,12 +180,12 @@ func (m *home) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if selected == nil {
 			return m, nil
 		}
-		
+
 		// Delete from storage first
 		if err := m.storage.DeleteInstance(selected.Title); err != nil {
 			return m.showErrorMessageForShortTime(err)
 		}
-		
+
 		// Then kill the instance
 		m.list.Kill()
 		return m, tea.WindowSize()

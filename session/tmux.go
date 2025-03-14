@@ -111,7 +111,7 @@ func (t *TmuxSession) Attach() (exited chan struct{}) {
 		log.Printf("Warning: PTY already exists for session %s during attach, closing it", t.sanitizedName)
 		t.ptmx.Close()
 	}
-	
+
 	var err error
 	t.ptmx, err = pty.Start(attachCmd)
 	if err != nil {
@@ -182,7 +182,7 @@ func (t *TmuxSession) Close() error {
 		}
 		t.ptmx = nil
 	}
-	
+
 	cmd := exec.Command("tmux", "kill-session", "-t", t.sanitizedName)
 	if err := cmd.Run(); err != nil {
 		log.Printf("Error killing tmux session: %v", err)
