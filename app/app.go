@@ -2,6 +2,7 @@ package app
 
 import (
 	"claude-squad/keys"
+	"claude-squad/session"
 	"claude-squad/ui"
 	"context"
 	"fmt"
@@ -45,6 +46,9 @@ type home struct {
 	// global spinner instance. we plumb this down to where it's needed
 	spinner spinner.Model
 
+	// storage
+	storage *session.Storage
+
 	// input
 	inputDisabled bool
 
@@ -58,37 +62,84 @@ func newHome(ctx context.Context) *home {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
+
+	// Initialize storage
+	storage, err := session.NewStorage()
+	if err != nil {
+		fmt.Printf("Failed to initialize storage: %v\n", err)
+		os.Exit(1)
+	}
+
 	h := &home{
 		ctx:     ctx,
 		spinner: spinner.New(spinner.WithSpinner(spinner.MiniDot)),
 		menu:    ui.NewMenu(),
 		errBox:  ui.NewErrBox(),
 		preview: ui.NewPreviewPane(0, 0),
+		storage: storage,
 	}
 	h.list = ui.NewList(&h.spinner)
+
+	// Load saved instances
+	instances, err := storage.LoadInstances()
+	if err != nil {
+		fmt.Printf("Failed to load instances: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Add loaded instances to the list
+	for _, instance := range instances {
+		h.list.AddInstance(instance)
+	}
+
 	return h
 }
 
-// updateHandleWindowSizeEvent is really important since it sets the sizes of the components.
+// updateHandleWindowSizeEvent sets the sizes of the components.
 // The components will try to render inside their bounds.
 func (m *home) updateHandleWindowSizeEvent(msg tea.WindowSizeMsg) {
 	m.windowWidth, m.windowHeight = msg.Width, msg.Height
 
-	m.preview.SetSize(int(float32(msg.Width)*0.7), int(float32(msg.Height)*0.8))
-	m.list.SetSize(int(float32(msg.Width)*0.3), int(float32(msg.Height)*0.8))
-	m.menu.SetSize(msg.Width, int(float32(msg.Height)*0.1))
+	// List takes 30% of width, preview takes 70%
+	listWidth := int(float32(msg.Width) * 0.3)
+	previewWidth := msg.Width - listWidth
+
+	// Menu takes 10% of height, list and preview take 90%
+	contentHeight := int(float32(msg.Height) * 0.9)
+	menuHeight := msg.Height - contentHeight
+
+	m.preview.SetSize(previewWidth, contentHeight)
+	m.list.SetSize(listWidth, contentHeight)
+	m.menu.SetSize(msg.Width, menuHeight)
 }
 
 func (m *home) Init() tea.Cmd {
 	// Upon starting, we want to start the spinner. Whenever we get a spinner.TickMsg, we
 	// update the spinner, which sends a new spinner.TickMsg. I think this lasts forever lol.
-	return m.spinner.Tick
+	return tea.Batch(
+		m.spinner.Tick,
+		func() tea.Msg {
+			time.Sleep(100 * time.Millisecond)
+			return previewTickMsg{}
+		},
+	)
 }
 
 func (m *home) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case hideErrMsg:
 		m.errBox.Clear()
+	case previewTickMsg:
+		var cmd tea.Cmd
+		model, cmd := m.updatePreview()
+		m = model.(*home)
+		return m, tea.Batch(
+			cmd,
+			func() tea.Msg {
+				time.Sleep(100 * time.Millisecond)
+				return previewTickMsg{}
+			},
+		)
 	case tea.KeyMsg:
 		return m.handleKeyPress(msg)
 	case tea.WindowSizeMsg:
@@ -112,22 +163,54 @@ func (m *home) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	switch name {
 	case keys.KeyQuit:
+		// Save instances before quitting
+		if err := m.storage.SaveInstances(m.list.GetInstances()); err != nil {
+			return m.showErrorMessageForShortTime(err)
+		}
 		m.quitting = true
 		return m, tea.Quit
-	case keys.KeyDown:
-		m.list.Down()
-		return m, nil
-	case keys.KeyKill:
-		m.list.Kill()
-		return m, tea.WindowSize()
 	case keys.KeyUp:
 		m.list.Up()
-		return m, nil
+		return m.updatePreview()
+	case keys.KeyDown:
+		m.list.Down()
+		return m.updatePreview()
+	case keys.KeyKill:
+		selected := m.list.GetSelectedInstance()
+		if selected == nil {
+			return m, nil
+		}
+
+		// Delete from storage first
+		if err := m.storage.DeleteInstance(selected.Title); err != nil {
+			return m.showErrorMessageForShortTime(err)
+		}
+
+		// Then kill the instance
+		m.list.Kill()
+		return m, tea.WindowSize()
 	case keys.KeyNew:
 		if m.list.NumInstances() >= GlobalInstanceLimit {
 			return m.showErrorMessageForShortTime(
 				fmt.Errorf("you can't create more than %d instances", GlobalInstanceLimit))
 		}
+
+		instance, err := session.NewInstance(session.InstanceOptions{
+			Title:         fmt.Sprintf("session-%d", m.list.NumInstances()+1),
+			Path:          ".",
+			ReuseExisting: false,
+			ForceNew:      true, // Force new session to avoid conflicts
+		})
+		if err != nil {
+			return m.showErrorMessageForShortTime(err)
+		}
+		m.list.AddInstance(instance)
+
+		// Save after adding new instance
+		if err := m.storage.SaveInstances(m.list.GetInstances()); err != nil {
+			return m.showErrorMessageForShortTime(err)
+		}
+
 		return m, nil
 	// TODO: add more key bindings
 	case keys.KeyEnter:
@@ -137,11 +220,21 @@ func (m *home) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	default:
 		return m, nil
 	}
+}
+
+// updatePreview updates the preview pane with the currently selected instance
+func (m *home) updatePreview() (tea.Model, tea.Cmd) {
+	if err := m.preview.UpdateContent(m.list.GetSelectedInstance()); err != nil {
+		return m.showErrorMessageForShortTime(err)
+	}
 	return m, nil
 }
 
 // hideErrMsg implements tea.Msg and clears the error text from the screen.
 type hideErrMsg struct{}
+
+// previewTickMsg implements tea.Msg and triggers a preview update
+type previewTickMsg struct{}
 
 // showErrorMessageForShortTime sets the error message. We return a callback. I assume bubbletea calls the
 // callback in a goroutine because it says that tea.Msg / tea.Cmd should be used for IO operations. These

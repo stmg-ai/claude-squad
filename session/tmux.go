@@ -1,152 +1,296 @@
 package session
 
 import (
+	"context"
 	"fmt"
-	"github.com/creack/pty"
-	"golang.org/x/term"
 	"io"
 	"log"
 	"os"
 	"os/exec"
 	"os/signal"
-	"sync"
+	"regexp"
 	"syscall"
 	"time"
+
+	"github.com/creack/pty"
+	"golang.org/x/term"
 )
 
 // TmuxSession represents a managed tmux session
 type TmuxSession struct {
 	// The name of the tmux session
-	Name      string
+	Name string
+	// The sanitized name used for tmux commands
+	sanitizedName string
 	// The PTY for the session
-	ptmx      *os.File
+	ptmx *os.File
 	// The channel for window resize events
 	winchChan chan os.Signal
+	// The channel to signal detach completion
+	attachCh chan struct{}
+	// Terminal state before attach
+	oldState *term.State
+	// The width of the terminal
+	width int
+}
+
+func removeWhitespace(str string) string {
+	re := regexp.MustCompile(`\s+`)
+	return re.ReplaceAllString(str, "")
+}
+
+var SendSessionToBackgroundKeys = map[string]struct{}{
+	"esc": {},
 }
 
 func NewTmuxSession(name string) *TmuxSession {
 	return &TmuxSession{
-		Name:      name,
-		winchChan: make(chan os.Signal, 1),
+		Name:          name,
+		sanitizedName: removeWhitespace(name),
+		winchChan:     make(chan os.Signal, 1),
 	}
 }
 
-// Creates and starts a new detached tmux session
+// Start creates and starts a new detached tmux session
 func (t *TmuxSession) Start() error {
-	cmd := exec.Command("tmux", "new-session", "-d", "-s", t.Name)
+	log.Printf("Starting new tmux session: %s", t.sanitizedName)
+	// Check if the session already exists
+	if DoesSessionExist(t.sanitizedName) {
+		return fmt.Errorf("tmux session already exists: %s", t.sanitizedName)
+	}
+
+	// Create a new detached tmux session and start claude in it
+	cmd := exec.Command("tmux", "new-session", "-d", "-s", t.sanitizedName)
 
 	var err error
+	if t.ptmx != nil {
+		log.Printf("Warning: PTY already exists for session %s, closing it", t.sanitizedName)
+		t.ptmx.Close()
+	}
 	t.ptmx, err = pty.Start(cmd)
 	if err != nil {
+		log.Printf("Error starting tmux session: %v", err)
 		return fmt.Errorf("error starting tmux session: %v", err)
 	}
+	log.Printf("Successfully created PTY for session: %s", t.sanitizedName)
 
 	if err := t.updateWindowSize(); err != nil {
 		return fmt.Errorf("error updating window size: %v", err)
 	}
 
-	t.handleWindowResize()
+	t.MonitorWindowSize(context.Background())
 	return nil
 }
 
-// Attaches to an existing tmux session
-func (t *TmuxSession) Attach() error {
-	attachCmd := exec.Command("tmux", "attach-session", "-t", t.Name)
+// Restore attaches to an existing session and restores the window size
+func (t *TmuxSession) Restore() error {
+	ptmx, err := pty.Start(exec.Command("tmux", "attach-session", "-t", t.sanitizedName))
+	if err != nil {
+		return fmt.Errorf("error opening PTY: %v", err)
+	}
+	t.ptmx = ptmx
+
+	if err := t.updateWindowSize(); err != nil {
+		return fmt.Errorf("error updating window size: %v", err)
+	}
+
+	t.MonitorWindowSize(context.Background())
+	return nil
+}
+
+func (t *TmuxSession) Attach() (exited chan struct{}) {
+	log.Printf("Attaching to tmux session: %s", t.sanitizedName)
+	t.attachCh = make(chan struct{})
+	defer func() {
+		exited = t.attachCh
+	}()
+
+	attachCmd := exec.Command("tmux", "attach-session", "-t", t.sanitizedName)
+
+	if t.ptmx != nil {
+		log.Printf("Warning: PTY already exists for session %s during attach, closing it", t.sanitizedName)
+		t.ptmx.Close()
+	}
 
 	var err error
 	t.ptmx, err = pty.Start(attachCmd)
 	if err != nil {
-		return fmt.Errorf("error attaching to tmux session: %v", err)
+		log.Printf("Error attaching to session: %v", err)
+		return
 	}
+	log.Printf("Successfully created PTY for attach: %s", t.sanitizedName)
 
-	// Set terminal to raw mode so that all keyboard input is passed directly to tmux without
-	// being processed by the terminal driver. This allows tmux to handle all key combinations
-	// and control sequences properly. We restore the original terminal state when done.
 	oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
 	if err != nil {
-		return fmt.Errorf("error setting raw mode: %v", err)
+		log.Printf("error making terminal raw %s", err)
+		return
 	}
-	defer term.Restore(int(os.Stdin.Fd()), oldState)
+	t.oldState = oldState
 
-	var wg sync.WaitGroup
-	wg.Add(2)
-
-	// Handle output from tmux
+	// TODO: goroutines may outlive Session.
 	go func() {
-		defer wg.Done()
-		io.Copy(os.Stdout, t.ptmx)
+		// Copy tmux output to the local stdout.
+		_, _ = io.Copy(os.Stdout, t.ptmx)
+	}()
+	go func() {
+		// Copy tmux output to the local stdout.
+		_, _ = io.Copy(t.ptmx, os.Stdin)
 	}()
 
-	// Handle input to tmux
-	go func() {
-		defer wg.Done()
-		io.Copy(t.ptmx, os.Stdin)
-	}()
-
-	wg.Wait()
-	return nil
+	return
 }
 
-// Detaches from the current tmux session
+// Detach disconnects from the current tmux session
 func (t *TmuxSession) Detach() error {
-	detachCmd := exec.Command("tmux", "detach-client", "-s", t.Name)
+	defer func() {
+		if t.attachCh != nil {
+			close(t.attachCh)
+			t.attachCh = nil
+		}
+	}()
+
+	detachCmd := exec.Command("tmux", "detach-client", "-s", t.sanitizedName)
 	if err := detachCmd.Run(); err != nil {
 		return fmt.Errorf("error detaching from tmux session: %v", err)
 	}
+
+	if t.ptmx != nil {
+		if err := t.ptmx.Close(); err != nil {
+			log.Printf("error closing attach pty session: %v", err)
+		}
+		t.ptmx = nil
+	}
+
+	if t.oldState != nil {
+		if err := term.Restore(int(os.Stdin.Fd()), t.oldState); err != nil {
+			log.Printf("error restoring terminal state: %v", err)
+		}
+		t.oldState = nil
+	}
+
 	return nil
 }
 
-// Closes the tmux session
-func (t *TmuxSession) Close() {
+// Close terminates the tmux session and cleans up resources
+func (t *TmuxSession) Close() error {
+	log.Printf("Closing tmux session: %s", t.sanitizedName)
 	if t.ptmx != nil {
-		t.ptmx.Close()
+		log.Printf("Closing PTY for session: %s", t.sanitizedName)
+		if err := t.ptmx.Close(); err != nil {
+			log.Printf("Error closing PTY: %v", err)
+			return fmt.Errorf("error closing PTY: %v", err)
+		}
+		t.ptmx = nil
 	}
-	if t.winchChan != nil {
-		signal.Stop(t.winchChan)
-		close(t.winchChan)
+
+	cmd := exec.Command("tmux", "kill-session", "-t", t.sanitizedName)
+	if err := cmd.Run(); err != nil {
+		log.Printf("Error killing tmux session: %v", err)
+		return fmt.Errorf("error killing tmux session: %v", err)
 	}
+	log.Printf("Successfully closed session: %s", t.sanitizedName)
+	return nil
 }
 
-// Updates the window size of the PTY based on the current terminal dimensions
+// MonitorWindowSize monitors and handles window resize events
+func (t *TmuxSession) MonitorWindowSize(ctx context.Context) {
+	signal.Notify(t.winchChan, syscall.SIGWINCH)
+
+	// Send initial SIGWINCH to trigger the first resize
+	syscall.Kill(syscall.Getpid(), syscall.SIGWINCH)
+
+	go func() {
+		debouncedWinch := make(chan os.Signal, 1)
+		defer signal.Stop(t.winchChan)
+
+		// Debounce resize events
+		go func() {
+			var resizeTimer *time.Timer
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-t.winchChan:
+					if resizeTimer != nil {
+						resizeTimer.Stop()
+					}
+					resizeTimer = time.AfterFunc(50*time.Millisecond, func() {
+						select {
+						case debouncedWinch <- syscall.SIGWINCH:
+						case <-ctx.Done():
+						}
+					})
+				}
+			}
+		}()
+
+		// Handle resize events
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-debouncedWinch:
+				if err := t.updateWindowSize(); err != nil {
+					log.Printf("failed to update window size: %v", err)
+				}
+			}
+		}
+	}()
+}
+
+// updateWindowSize updates the window size of the PTY based on the current terminal dimensions
 func (t *TmuxSession) updateWindowSize() error {
+	if t.ptmx == nil {
+		return nil
+	}
+
 	cols, rows, err := term.GetSize(int(os.Stdin.Fd()))
 	if err != nil {
 		return err
 	}
 
-	return pty.Setsize(t.ptmx, &pty.Winsize{
+	// Calculate the preview width as 70% of total width
+	previewWidth := int(float64(cols) * 0.7)
+	t.width = previewWidth
+
+	// Set the PTY size
+	if err := pty.Setsize(t.ptmx, &pty.Winsize{
 		Rows: uint16(rows),
-		Cols: uint16(cols),
+		Cols: uint16(previewWidth), // Use preview width for the tmux pane
 		X:    0,
 		Y:    0,
-	})
+	}); err != nil {
+		return err
+	}
+
+	return nil
 }
 
-func (t *TmuxSession) handleWindowResize() {
-	signal.Notify(t.winchChan, syscall.SIGWINCH)
+// DoesSessionExist checks if a tmux session exists
+func DoesSessionExist(name string) bool {
+	existsCmd := exec.Command("tmux", "has-session", "-t", name)
+	return existsCmd.Run() == nil
+}
 
-	go func() {
-		// Send initial SIGWINCH to trigger the first resize
-		syscall.Kill(syscall.Getpid(), syscall.SIGWINCH)
+// CapturePaneContent captures the content of the tmux pane
+func (t *TmuxSession) CapturePaneContent() (string, error) {
+	// Add -e flag to preserve escape sequences (ANSI color codes)
+	cmd := exec.Command("tmux", "capture-pane", "-p", "-e", "-J", "-t", t.sanitizedName)
+	output, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("error capturing pane content: %v", err)
+	}
+	return string(output), nil
+}
 
-		// Create a debounced channel for resize events
-		debouncedWinch := make(chan os.Signal)
-		go func() {
-			var resizeTimer *time.Timer
-			for range t.winchChan {
-				if resizeTimer != nil {
-					resizeTimer.Stop()
-				}
-				resizeTimer = time.AfterFunc(50*time.Millisecond, func() {
-					debouncedWinch <- syscall.SIGWINCH
-				})
-			}
-		}()
-
-		for range debouncedWinch {
-			if err := t.updateWindowSize(); err != nil {
-				log.Printf("failed to update window size: %v", err)
-			}
-		}
-	}()
+// CapturePaneContentWithOptions captures the pane content with additional options
+// start and end specify the starting and ending line numbers (use "-" for the start/end of history)
+func (t *TmuxSession) CapturePaneContentWithOptions(start, end string) (string, error) {
+	// Add -e flag to preserve escape sequences (ANSI color codes)
+	cmd := exec.Command("tmux", "capture-pane", "-p", "-e", "-J", "-S", start, "-E", end, "-t", t.sanitizedName)
+	output, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("failed to capture tmux pane content with options: %v", err)
+	}
+	return string(output), nil
 }

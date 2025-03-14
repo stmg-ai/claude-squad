@@ -14,7 +14,6 @@ var errStyle = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{
 	Dark:  "#FF0000",
 })
 
-
 func NewErrBox() *ErrBox {
 	return &ErrBox{}
 }
