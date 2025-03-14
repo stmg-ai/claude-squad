@@ -1,11 +1,12 @@
 package ui
 
 import (
-	"claude-squad/tmux"
+	"claude-squad/session"
 	"fmt"
+	"strings"
+
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/lipgloss"
-	"strings"
 )
 
 const readyIcon = "●"
@@ -29,51 +30,17 @@ var mainTitle = lipgloss.NewStyle().
 	Background(lipgloss.Color("62")).
 	Foreground(lipgloss.Color("230"))
 
-type Status int
-
-const (
-	// Running is the status when the instance is running and claude is working.
-	Running Status = iota
-	// Ready is if the claude instance is ready to be interacted with (waiting for user input).
-	Ready
-	// Loading is if the instance is loading (if we are starting it up or something).
-	Loading
-)
-
-type Instance struct {
-	title  string
-	path   string // workspace path?
-	status Status
-	height int
-	width  int
-
-	tmux *tmux.Session
-}
-
 type List struct {
-	items         []*Instance
+	items         []*session.Instance
 	selectedIdx   int
 	height, width int
-
-	// global spinner which is always spinning. we can choose to render it or not
-	spinner *spinner.Model
+	renderer      *InstanceRenderer
 }
 
 func NewList(spinner *spinner.Model) *List {
 	return &List{
-		items: []*Instance{
-			{title: "asdf", path: "../blah", status: Running, tmux: tmux.NewTmuxSession("a")},
-			{title: "banana", path: "../blah", status: Ready, tmux: tmux.NewTmuxSession("b")},
-			{title: "apple banana", path: "../blah", status: Loading, tmux: tmux.NewTmuxSession("c")},
-			{title: "peach apple", path: "../blah", status: Running, tmux: tmux.NewTmuxSession("d")},
-			//{title: "peach banana", path: "../blah", status: Running, tmux: tmux.NewTmuxSession(context.Background())},
-			//{title: "test 6", path: "../blah", status: Running, tmux: tmux.NewTmuxSession(context.Background())},
-			//{title: "asdf", path: "../blah", status: Ready, tmux: tmux.NewTmuxSession(context.Background())},
-			//{title: "banana", path: "../blah", status: Loading, tmux: tmux.NewTmuxSession(context.Background())},
-			//{title: "apple banana", path: "../blah", status: Ready, tmux: tmux.NewTmuxSession(context.Background())},
-			//{title: "peach apple", path: "../blah", status: Loading, tmux: tmux.NewTmuxSession(context.Background())},
-		},
-		spinner: spinner,
+		items:    []*session.Instance{},
+		renderer: &InstanceRenderer{spinner: spinner},
 	}
 }
 
@@ -87,7 +54,12 @@ func (l *List) NumInstances() int {
 	return len(l.items)
 }
 
-func (i *Instance) Render(idx int, selected bool, spinner *spinner.Model) string {
+// InstanceRenderer handles rendering of session.Instance objects
+type InstanceRenderer struct {
+	spinner *spinner.Model
+}
+
+func (r *InstanceRenderer) Render(i *session.Instance, idx int, selected bool) string {
 	prefix := fmt.Sprintf(" %d. ", idx)
 	titleS := selectedTitleStyle
 	descS := selectedDescStyle
@@ -96,14 +68,14 @@ func (i *Instance) Render(idx int, selected bool, spinner *spinner.Model) string
 		descS = listDescStyle
 	}
 
-	title := titleS.Render(fmt.Sprintf("%s %s", prefix, i.title))
+	title := titleS.Render(fmt.Sprintf("%s %s", prefix, i.Title))
 
 	// add spinner next to title if it's running
 	var join string
-	switch i.status {
-	case Running:
-		join = spinner.View()
-	case Ready:
+	switch i.Status {
+	case session.Running:
+		join = r.spinner.View()
+	case session.Ready:
 		join = readyStyle.Render(readyIcon)
 	default:
 
@@ -119,11 +91,10 @@ func (i *Instance) Render(idx int, selected bool, spinner *spinner.Model) string
 	text := lipgloss.JoinVertical(
 		lipgloss.Left,
 		title,
-		descS.Render(fmt.Sprintf("%s %s", strings.Repeat(" ", len(prefix)), i.path)),
+		descS.Render(fmt.Sprintf("%s %s", strings.Repeat(" ", len(prefix)), i.Path)),
 	)
 
 	return text
-
 }
 
 func (l *List) String() string {
@@ -137,7 +108,7 @@ func (l *List) String() string {
 
 	// Render the list.
 	for i, item := range l.items {
-		b.WriteString(item.Render(i+1, i == l.selectedIdx, l.spinner))
+		b.WriteString(l.renderer.Render(item, i+1, i == l.selectedIdx))
 		if i != len(l.items)-1 {
 			b.WriteString("\n\n")
 		}
@@ -161,20 +132,24 @@ func (l *List) Kill() {
 		return
 	}
 	targetInstance := l.items[l.selectedIdx]
+
+	// Kill the tmux session
+	if err := targetInstance.Kill(); err != nil {
+		// TODO: handle error
+		return
+	}
+
 	// If you delete the last one in the list, select the previous one.
 	if l.selectedIdx == len(l.items)-1 {
 		defer l.Up()
 	}
 	// Since there's items after this, the selectedIdx can stay the same.
 	l.items = append(l.items[:l.selectedIdx], l.items[l.selectedIdx+1:]...)
-
-	// Blocks until the goroutine stop
-	targetInstance.tmux.Close()
 }
 
 func (l *List) Attach() chan struct{} {
 	targetInstance := l.items[l.selectedIdx]
-	return targetInstance.tmux.Attach()
+	return targetInstance.Attach()
 }
 
 // Up selects the prev item in the list.
@@ -185,4 +160,22 @@ func (l *List) Up() {
 	if l.selectedIdx > 0 {
 		l.selectedIdx--
 	}
+}
+
+// AddInstance adds a new instance to the list
+func (l *List) AddInstance(instance *session.Instance) {
+	l.items = append(l.items, instance)
+}
+
+// GetSelectedInstance returns the currently selected instance
+func (l *List) GetSelectedInstance() *session.Instance {
+	if len(l.items) == 0 {
+		return nil
+	}
+	return l.items[l.selectedIdx]
+}
+
+// GetInstances returns all instances in the list
+func (l *List) GetInstances() []*session.Instance {
+	return l.items
 }
