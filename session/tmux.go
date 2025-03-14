@@ -59,6 +59,7 @@ func (t *TmuxSession) Start() error {
 		return fmt.Errorf("tmux session already exists: %s", t.sanitizedName)
 	}
 
+	// Create a new detached tmux session and start claude in it
 	cmd := exec.Command("tmux", "new-session", "-d", "-s", t.sanitizedName)
 
 	var err error
@@ -273,7 +274,8 @@ func DoesSessionExist(name string) bool {
 
 // CapturePaneContent captures the content of the tmux pane
 func (t *TmuxSession) CapturePaneContent() (string, error) {
-	cmd := exec.Command("tmux", "capture-pane", "-p", "-J", "-t", t.sanitizedName)
+	// Add -e flag to preserve escape sequences (ANSI color codes)
+	cmd := exec.Command("tmux", "capture-pane", "-p", "-e", "-J", "-t", t.sanitizedName)
 	output, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("error capturing pane content: %v", err)
@@ -284,7 +286,8 @@ func (t *TmuxSession) CapturePaneContent() (string, error) {
 // CapturePaneContentWithOptions captures the pane content with additional options
 // start and end specify the starting and ending line numbers (use "-" for the start/end of history)
 func (t *TmuxSession) CapturePaneContentWithOptions(start, end string) (string, error) {
-	cmd := exec.Command("tmux", "capture-pane", "-p", "-J", "-S", start, "-E", end, "-t", t.sanitizedName)
+	// Add -e flag to preserve escape sequences (ANSI color codes)
+	cmd := exec.Command("tmux", "capture-pane", "-p", "-e", "-J", "-S", start, "-E", end, "-t", t.sanitizedName)
 	output, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("failed to capture tmux pane content with options: %v", err)

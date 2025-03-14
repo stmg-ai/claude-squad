@@ -132,4 +132,29 @@ func (s *Storage) UpdateInstance(instance *Instance) error {
 	}
 
 	return fmt.Errorf("instance not found: %s", instance.Title)
+}
+
+// DeleteAllInstances removes all stored instances and their backups
+func (s *Storage) DeleteAllInstances() error {
+	// Remove the main instances file
+	if err := os.Remove(s.filePath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to delete instances file: %w", err)
+	}
+
+	// Remove all backup files
+	entries, err := os.ReadDir(s.backupDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to read backup directory: %w", err)
+	}
+
+	for _, entry := range entries {
+		if err := os.Remove(filepath.Join(s.backupDir, entry.Name())); err != nil {
+			return fmt.Errorf("failed to delete backup file %s: %w", entry.Name(), err)
+		}
+	}
+
+	return nil
 } 

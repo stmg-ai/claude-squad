@@ -16,7 +16,7 @@ type PreviewPane struct {
 	width     int
 	maxHeight int
 
-	// text is the raw text being rendered.
+	// text is the raw text being rendered, including ANSI color codes
 	text string
 }
 
@@ -65,13 +65,14 @@ func (p *PreviewPane) String() string {
 	// Calculate available height accounting for border and margin
 	availableHeight := p.maxHeight - 3 // 2 for borders, 1 for margin
 
-	// Split the raw text into lines first
+	// Split the raw text into lines first, preserving ANSI codes
 	lines := strings.Split(p.text, "\n")
 	if len(lines) > availableHeight && availableHeight > 0 {
 		lines = lines[:availableHeight]
 		lines = append(lines, "...")
 	}
 
-	// Do only ONE render with the final content
-	return previewPaneStyle.Width(p.width).Render(strings.Join(lines, "\n"))
+	// Join lines and wrap in preview pane style while preserving ANSI codes
+	content := strings.Join(lines, "\n")
+	return previewPaneStyle.Width(p.width).Render(content)
 }
