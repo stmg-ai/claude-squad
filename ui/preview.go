@@ -59,7 +59,19 @@ func (p *PreviewPane) String() string {
 		return strings.Repeat("\n", p.maxHeight)
 	}
 	if len(p.text) == 0 {
-		return previewPaneStyle.Render("No content to display")
+		return previewPaneStyle.Width(p.width).Render("No content to display")
 	}
-	return previewPaneStyle.Render(p.text)
+
+	// Calculate available height accounting for border and margin
+	availableHeight := p.maxHeight - 3 // 2 for borders, 1 for margin
+
+	// Split the raw text into lines first
+	lines := strings.Split(p.text, "\n")
+	if len(lines) > availableHeight && availableHeight > 0 {
+		lines = lines[:availableHeight]
+		lines = append(lines, "...")
+	}
+
+	// Do only ONE render with the final content
+	return previewPaneStyle.Width(p.width).Render(strings.Join(lines, "\n"))
 }

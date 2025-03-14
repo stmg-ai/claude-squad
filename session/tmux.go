@@ -30,6 +30,8 @@ type TmuxSession struct {
 	attachCh chan struct{}
 	// Terminal state before attach
 	oldState *term.State
+	// The width of the terminal
+	width int
 }
 
 func removeWhitespace(str string) string {
@@ -246,12 +248,21 @@ func (t *TmuxSession) updateWindowSize() error {
 		return err
 	}
 
-	return pty.Setsize(t.ptmx, &pty.Winsize{
+	// Calculate the preview width as 70% of total width
+	previewWidth := int(float64(cols) * 0.7)
+	t.width = previewWidth
+
+	// Set the PTY size
+	if err := pty.Setsize(t.ptmx, &pty.Winsize{
 		Rows: uint16(rows),
-		Cols: uint16(cols),
+		Cols: uint16(previewWidth), // Use preview width for the tmux pane
 		X:    0,
 		Y:    0,
-	})
+	}); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // DoesSessionExist checks if a tmux session exists
@@ -262,7 +273,7 @@ func DoesSessionExist(name string) bool {
 
 // CapturePaneContent captures the content of the tmux pane
 func (t *TmuxSession) CapturePaneContent() (string, error) {
-	cmd := exec.Command("tmux", "capture-pane", "-p", "-t", t.sanitizedName)
+	cmd := exec.Command("tmux", "capture-pane", "-p", "-J", "-t", t.sanitizedName)
 	output, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("error capturing pane content: %v", err)
