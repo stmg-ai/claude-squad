@@ -2,8 +2,9 @@ package ui
 
 import (
 	"claude-squad/keys"
-	"github.com/charmbracelet/lipgloss"
 	"strings"
+
+	"github.com/charmbracelet/lipgloss"
 )
 
 var keyStyle = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{
@@ -33,7 +34,7 @@ type Menu struct {
 
 func NewMenu() *Menu {
 	return &Menu{
-		options: []keys.KeyName{keys.KeyNew, keys.KeyKill, keys.KeyEnter, keys.KeyReview, keys.KeyQuit},
+		options: []keys.KeyName{keys.KeyNew, keys.KeyKill, keys.KeyEnter, keys.KeyPush, keys.KeyQuit},
 	}
 }
 

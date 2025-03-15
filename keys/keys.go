@@ -14,6 +14,7 @@ const (
 	KeyKill
 	KeyQuit
 	KeyReview
+	KeyPush
 )
 
 // GlobalKeyStringsMap is a global, immutable map string to keybinding.
@@ -28,6 +29,7 @@ var GlobalKeyStringsMap = map[string]KeyName{
 	"d":     KeyKill,
 	"q":     KeyQuit,
 	"r":     KeyReview,
+	"p":     KeyPush,
 }
 
 // GlobalkeyBindings is a global, immutable map of KeyName tot keybinding.
@@ -59,5 +61,9 @@ var GlobalkeyBindings = map[KeyName]key.Binding{
 	KeyReview: key.NewBinding(
 		key.WithKeys("r"),
 		key.WithHelp("r", "review"),
+	),
+	KeyPush: key.NewBinding(
+		key.WithKeys("p"),
+		key.WithHelp("p", "push branch"),
 	),
 }

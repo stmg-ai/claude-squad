@@ -32,6 +32,8 @@ type TmuxSession struct {
 	oldState *term.State
 	// The width of the terminal
 	width int
+	// The working directory for the session
+	workDir string
 }
 
 func removeWhitespace(str string) string {
@@ -51,31 +53,51 @@ func NewTmuxSession(name string) *TmuxSession {
 	}
 }
 
+// SetWorkDir sets the working directory for the session
+func (t *TmuxSession) SetWorkDir(dir string) {
+	t.workDir = dir
+}
+
 // Start creates and starts a new detached tmux session
-func (t *TmuxSession) Start() error {
-	log.Printf("Starting new tmux session: %s", t.sanitizedName)
+func (t *TmuxSession) Start(command string) error {
 	// Check if the session already exists
 	if DoesSessionExist(t.sanitizedName) {
 		return fmt.Errorf("tmux session already exists: %s", t.sanitizedName)
 	}
 
 	// Create a new detached tmux session and start claude in it
-	cmd := exec.Command("tmux", "new-session", "-d", "-s", t.sanitizedName)
+	var cmd *exec.Cmd
+	if t.workDir != "" {
+		cmd = exec.Command("tmux", "new-session", "-d", "-s", t.sanitizedName, "-c", t.workDir, command)
+	} else {
+		cmd = exec.Command("tmux", "new-session", "-d", "-s", t.sanitizedName, command)
+	}
+
+	// Close existing PTY if it exists
+	if t.ptmx != nil {
+		t.ptmx.Close()
+		t.ptmx = nil
+	}
 
 	var err error
-	if t.ptmx != nil {
-		log.Printf("Warning: PTY already exists for session %s, closing it", t.sanitizedName)
-		t.ptmx.Close()
-	}
 	t.ptmx, err = pty.Start(cmd)
 	if err != nil {
-		log.Printf("Error starting tmux session: %v", err)
-		return fmt.Errorf("error starting tmux session: %v", err)
+		// Cleanup any partially created session
+		if DoesSessionExist(t.sanitizedName) {
+			cleanupCmd := exec.Command("tmux", "kill-session", "-t", t.sanitizedName)
+			if cleanupErr := cleanupCmd.Run(); cleanupErr != nil {
+				err = fmt.Errorf("%v (cleanup error: %v)", err, cleanupErr)
+			}
+		}
+		return fmt.Errorf("error starting tmux session: %w", err)
 	}
-	log.Printf("Successfully created PTY for session: %s", t.sanitizedName)
 
 	if err := t.updateWindowSize(); err != nil {
-		return fmt.Errorf("error updating window size: %v", err)
+		// Cleanup on window size update failure
+		if cleanupErr := t.Close(); cleanupErr != nil {
+			err = fmt.Errorf("%v (cleanup error: %v)", err, cleanupErr)
+		}
+		return fmt.Errorf("error updating window size: %w", err)
 	}
 
 	t.MonitorWindowSize(context.Background())
@@ -86,12 +108,27 @@ func (t *TmuxSession) Start() error {
 func (t *TmuxSession) Restore() error {
 	ptmx, err := pty.Start(exec.Command("tmux", "attach-session", "-t", t.sanitizedName))
 	if err != nil {
-		return fmt.Errorf("error opening PTY: %v", err)
+		return fmt.Errorf("error opening PTY: %w", err)
 	}
+
+	// Store old PTY to cleanup if something goes wrong
+	oldPtmx := t.ptmx
 	t.ptmx = ptmx
 
 	if err := t.updateWindowSize(); err != nil {
-		return fmt.Errorf("error updating window size: %v", err)
+		// Restore old PTY and cleanup new one on failure
+		if oldPtmx != nil {
+			t.ptmx = oldPtmx
+		}
+		if cleanupErr := ptmx.Close(); cleanupErr != nil {
+			err = fmt.Errorf("%v (cleanup error: %v)", err, cleanupErr)
+		}
+		return fmt.Errorf("error updating window size: %w", err)
+	}
+
+	// Cleanup old PTY now that new one is successfully set up
+	if oldPtmx != nil {
+		oldPtmx.Close()
 	}
 
 	t.MonitorWindowSize(context.Background())
@@ -99,7 +136,6 @@ func (t *TmuxSession) Restore() error {
 }
 
 func (t *TmuxSession) Attach() (exited chan struct{}) {
-	log.Printf("Attaching to tmux session: %s", t.sanitizedName)
 	t.attachCh = make(chan struct{})
 	defer func() {
 		exited = t.attachCh
@@ -107,25 +143,34 @@ func (t *TmuxSession) Attach() (exited chan struct{}) {
 
 	attachCmd := exec.Command("tmux", "attach-session", "-t", t.sanitizedName)
 
-	if t.ptmx != nil {
-		log.Printf("Warning: PTY already exists for session %s during attach, closing it", t.sanitizedName)
-		t.ptmx.Close()
+	// Store old state to restore on failure
+	oldPtmx := t.ptmx
+	oldState := t.oldState
+
+	if oldPtmx != nil {
+		oldPtmx.Close()
 	}
 
 	var err error
 	t.ptmx, err = pty.Start(attachCmd)
 	if err != nil {
-		log.Printf("Error attaching to session: %v", err)
+		// Restore old state on failure
+		t.ptmx = oldPtmx
+		t.oldState = oldState
 		return
 	}
-	log.Printf("Successfully created PTY for attach: %s", t.sanitizedName)
 
-	oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
+	newState, err := term.MakeRaw(int(os.Stdin.Fd()))
 	if err != nil {
-		log.Printf("error making terminal raw %s", err)
+		// Cleanup new PTY and restore old state on failure
+		if cleanupErr := t.ptmx.Close(); cleanupErr != nil {
+			err = fmt.Errorf("%v (cleanup error: %v)", err, cleanupErr)
+		}
+		t.ptmx = oldPtmx
+		t.oldState = oldState
 		return
 	}
-	t.oldState = oldState
+	t.oldState = newState
 
 	// TODO: goroutines may outlive Session.
 	go func() {
@@ -151,19 +196,19 @@ func (t *TmuxSession) Detach() error {
 
 	detachCmd := exec.Command("tmux", "detach-client", "-s", t.sanitizedName)
 	if err := detachCmd.Run(); err != nil {
-		return fmt.Errorf("error detaching from tmux session: %v", err)
+		return fmt.Errorf("error detaching from tmux session: %w", err)
 	}
 
 	if t.ptmx != nil {
 		if err := t.ptmx.Close(); err != nil {
-			log.Printf("error closing attach pty session: %v", err)
+			return fmt.Errorf("error closing attach pty session: %w", err)
 		}
 		t.ptmx = nil
 	}
 
 	if t.oldState != nil {
 		if err := term.Restore(int(os.Stdin.Fd()), t.oldState); err != nil {
-			log.Printf("error restoring terminal state: %v", err)
+			return fmt.Errorf("error restoring terminal state: %w", err)
 		}
 		t.oldState = nil
 	}
@@ -173,23 +218,32 @@ func (t *TmuxSession) Detach() error {
 
 // Close terminates the tmux session and cleans up resources
 func (t *TmuxSession) Close() error {
-	log.Printf("Closing tmux session: %s", t.sanitizedName)
+	var errs []error
+
 	if t.ptmx != nil {
-		log.Printf("Closing PTY for session: %s", t.sanitizedName)
 		if err := t.ptmx.Close(); err != nil {
-			log.Printf("Error closing PTY: %v", err)
-			return fmt.Errorf("error closing PTY: %v", err)
+			errs = append(errs, fmt.Errorf("error closing PTY: %w", err))
 		}
 		t.ptmx = nil
 	}
 
 	cmd := exec.Command("tmux", "kill-session", "-t", t.sanitizedName)
 	if err := cmd.Run(); err != nil {
-		log.Printf("Error killing tmux session: %v", err)
-		return fmt.Errorf("error killing tmux session: %v", err)
+		errs = append(errs, fmt.Errorf("error killing tmux session: %w", err))
 	}
-	log.Printf("Successfully closed session: %s", t.sanitizedName)
-	return nil
+
+	if len(errs) == 0 {
+		return nil
+	}
+	if len(errs) == 1 {
+		return errs[0]
+	}
+
+	errMsg := "multiple errors occurred during cleanup:"
+	for _, err := range errs {
+		errMsg += "\n  - " + err.Error()
+	}
+	return fmt.Errorf(errMsg)
 }
 
 // MonitorWindowSize monitors and handles window resize events

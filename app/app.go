@@ -31,6 +31,8 @@ const (
 	stateDefault state = iota
 	// stateNew is the state when the user is creating a new instance.
 	stateNew
+	// statePush is the state when the user is pushing changes
+	statePush
 )
 
 type home struct {
@@ -204,10 +206,8 @@ func (m *home) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 		instance, err := session.NewInstance(session.InstanceOptions{
-			Title:         fmt.Sprintf("session-%d", m.list.NumInstances()+1),
-			Path:          ".",
-			ReuseExisting: false,
-			ForceNew:      true, // Force new session to avoid conflicts
+			Title: fmt.Sprintf("instance-%d", m.list.NumInstances()+1),
+			Path:  ".",
 		})
 		if err != nil {
 			return m.showErrorMessageForShortTime(err)
@@ -216,6 +216,20 @@ func (m *home) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 		// Save after adding new instance
 		if err := m.storage.SaveInstances(m.list.GetInstances()); err != nil {
+			return m.showErrorMessageForShortTime(err)
+		}
+
+		return m, nil
+	case keys.KeyPush:
+		selected := m.list.GetSelectedInstance()
+		if selected == nil {
+			return m, nil
+		}
+
+		// Default commit message with timestamp
+		commitMsg := fmt.Sprintf("Update from session %s at %s", selected.Title, time.Now().Format(time.RFC3339))
+
+		if err := selected.GetGitWorktree().PushChanges(commitMsg); err != nil {
 			return m.showErrorMessageForShortTime(err)
 		}
 

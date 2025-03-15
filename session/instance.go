@@ -1,6 +1,8 @@
 package session
 
 import (
+	"claude-squad/session/git"
+
 	"fmt"
 	"time"
 )
@@ -16,16 +18,26 @@ const (
 	Loading
 )
 
-// A running instance of claude code.
+// Instance is a running instance of claude code.
 type Instance struct {
-	Title       string
-	Path        string // workspace path?
-	Status      Status
-	Height      int
-	Width       int
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	// Title is the title of the instance.
+	Title string
+	// Path is the path to the workspace.
+	Path string
+	// Status is the status of the instance.
+	Status Status
+	// Height is the height of the instance.
+	Height int
+	// Width is the width of the instance.
+	Width int
+	// CreatedAt is the time the instance was created.
+	CreatedAt time.Time
+	// UpdatedAt is the time the instance was last updated.
+	UpdatedAt time.Time
+	// tmuxSession is the tmux session for the instance.
 	tmuxSession *TmuxSession
+	// gitWorktree is the git worktree for the instance.
+	gitWorktree *git.GitWorktree
 }
 
 // ToInstanceData converts an Instance to its serializable form
@@ -61,12 +73,10 @@ func FromInstanceData(data InstanceData) (*Instance, error) {
 
 // Options for creating a new instance
 type InstanceOptions struct {
+	// Title is the title of the instance.
 	Title string
-	Path  string
-	// ReuseExisting determines whether to reuse an existing session if it exists
-	ReuseExisting bool
-	// ForceNew forces creation of a new session, killing existing if necessary
-	ForceNew bool
+	// Path is the path to the workspace.
+	Path string
 	// RestoreFromStorage indicates this is being restored from storage, skip tmux operations
 	RestoreFromStorage bool
 }
@@ -77,6 +87,7 @@ func NewInstance(opts InstanceOptions) (*Instance, error) {
 	}
 
 	tmuxSession := NewTmuxSession(opts.Title)
+	gitWorktree := git.NewGitWorktree(opts.Path, opts.Title)
 
 	// If restoring from storage, create instance without tmux operations
 	if opts.RestoreFromStorage {
@@ -86,51 +97,103 @@ func NewInstance(opts InstanceOptions) (*Instance, error) {
 			Path:        opts.Path,
 			Status:      Loading,
 			tmuxSession: tmuxSession,
+			gitWorktree: gitWorktree,
 			CreatedAt:   now,
 			UpdatedAt:   now,
 		}, nil
 	}
 
-	sessionExists := DoesSessionExist(opts.Title)
-
-	if sessionExists {
-		if opts.ForceNew {
-			// Kill existing session if force new is requested
-			if err := tmuxSession.Close(); err != nil {
-				return nil, fmt.Errorf("failed to kill existing session: %v", err)
-			}
-			sessionExists = false
-		} else if !opts.ReuseExisting {
-			return nil, fmt.Errorf("session already exists: %s (use ReuseExisting or ForceNew to handle existing session)", opts.Title)
-		}
-	}
-
-	var err error
-	if sessionExists {
-		// Reuse existing session
-		if err = tmuxSession.Restore(); err != nil {
-			return nil, fmt.Errorf("failed to restore existing session: %v", err)
-		}
-	} else {
-		// Create new session
-		if err = tmuxSession.Start(); err != nil {
-			return nil, fmt.Errorf("failed to start new session: %v", err)
-		}
-	}
-
+	// Create instance first so we can use its cleanup methods
 	now := time.Now()
-	return &Instance{
+	instance := &Instance{
 		Title:       opts.Title,
 		Path:        opts.Path,
 		Status:      Loading,
 		tmuxSession: tmuxSession,
+		gitWorktree: gitWorktree,
 		CreatedAt:   now,
 		UpdatedAt:   now,
-	}, nil
+	}
+
+	// Setup error handler to cleanup resources on any error
+	var setupErr error
+	defer func() {
+		if setupErr != nil {
+			if cleanupErr := instance.Kill(); cleanupErr != nil {
+				setupErr = fmt.Errorf("%v (cleanup error: %v)", setupErr, cleanupErr)
+			}
+		}
+	}()
+
+	sessionExists := DoesSessionExist(opts.Title)
+
+	if sessionExists {
+		// Reuse existing session
+		if err := tmuxSession.Restore(); err != nil {
+			setupErr = fmt.Errorf("failed to restore existing session: %w", err)
+			return nil, setupErr
+		}
+	} else {
+		// Setup git worktree first
+		if err := gitWorktree.Setup(); err != nil {
+			setupErr = fmt.Errorf("failed to setup git worktree: %w", err)
+			return nil, setupErr
+		}
+
+		// Set the working directory for the tmux session to the git worktree path
+		tmuxSession.SetWorkDir(gitWorktree.GetWorktreePath())
+
+		// Create new session
+		if err := tmuxSession.Start("aider --model ollama_chat/gemma3:1b"); err != nil {
+			// Cleanup git worktree if tmux session creation fails
+			if cleanupErr := gitWorktree.Cleanup(); cleanupErr != nil {
+				err = fmt.Errorf("%v (cleanup error: %v)", err, cleanupErr)
+			}
+			setupErr = fmt.Errorf("failed to start new session: %w", err)
+			return nil, setupErr
+		}
+	}
+
+	return instance, nil
 }
 
+// Kill terminates the instance and cleans up all resources
 func (i *Instance) Kill() error {
-	return i.tmuxSession.Close()
+	var errs []error
+
+	// Always try to cleanup both resources, even if one fails
+	// Clean up tmux session first since it's using the git worktree
+	if err := i.tmuxSession.Close(); err != nil {
+		errs = append(errs, fmt.Errorf("failed to close tmux session: %w", err))
+	}
+
+	// Then clean up git worktree
+	if err := i.gitWorktree.Cleanup(); err != nil {
+		errs = append(errs, fmt.Errorf("failed to cleanup git worktree: %w", err))
+	}
+
+	return i.combineErrors(errs)
+}
+
+// combineErrors combines multiple errors into a single error
+func (i *Instance) combineErrors(errs []error) error {
+	if len(errs) == 0 {
+		return nil
+	}
+	if len(errs) == 1 {
+		return errs[0]
+	}
+
+	errMsg := "multiple cleanup errors occurred:"
+	for _, err := range errs {
+		errMsg += "\n  - " + err.Error()
+	}
+	return fmt.Errorf(errMsg)
+}
+
+// Close is an alias for Kill to maintain backward compatibility
+func (i *Instance) Close() error {
+	return i.Kill()
 }
 
 func (i *Instance) Preview() (string, error) {
@@ -141,6 +204,7 @@ func (i *Instance) Attach() chan struct{} {
 	return i.tmuxSession.Attach()
 }
 
-func (i *Instance) Close() error {
-	return i.tmuxSession.Close()
+// GetGitWorktree returns the git worktree for the instance
+func (i *Instance) GetGitWorktree() *git.GitWorktree {
+	return i.gitWorktree
 }

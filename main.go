@@ -74,7 +74,7 @@ func tmuxMain() {
 	tmux := session.NewTmuxSession("my_session")
 	defer tmux.Close()
 
-	if err := tmux.Start(); err != nil {
+	if err := tmux.Start("claude"); err != nil {
 		log.Fatalf("Error starting tmux session: %v", err)
 	}
 
