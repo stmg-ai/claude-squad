@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"regexp"
+	"sync"
 	"syscall"
 	"time"
 
@@ -18,22 +19,31 @@ import (
 
 // TmuxSession represents a managed tmux session
 type TmuxSession struct {
-	// The name of the tmux session
-	Name string
-	// The sanitized name used for tmux commands
+	// Initialized by NewTmuxSession
+	//
+	// The name of the tmux session and the sanitized name used for tmux commands.
+	Name          string
 	sanitizedName string
-	// The PTY for the session
+
+	// Initialized by Start or Restore
+	//
+	// ptmx is a PTY is running the tmux attach command. This can be resized to change the
+	// stdout dimensions of the tmux pane. On detach, we close it and set a new one.
+	// This should never be nil.
 	ptmx *os.File
-	// The channel for window resize events
-	winchChan chan os.Signal
-	// The channel to signal detach completion
+
+	// Initialized by Attach
+	// Deinitilaized by Detach
+	//
+	// Channel to be closed at the very end of detaching. Used to signal callers.
 	attachCh chan struct{}
-	// Terminal state before attach
+	// Terminal state before attach. Gets restored when detaching.
 	oldState *term.State
-	// The width of the terminal
-	width int
-	// The working directory for the session
-	workDir string
+	// While attached, we use some goroutines to manage the window size and stdin/stdout. This stuff
+	// is used to terminate them on Detach. We don't want them to outlive the attached window.
+	ctx    context.Context
+	cancel func()
+	wg     *sync.WaitGroup
 }
 
 func removeWhitespace(str string) string {
@@ -41,48 +51,27 @@ func removeWhitespace(str string) string {
 	return re.ReplaceAllString(str, "")
 }
 
-var SendSessionToBackgroundKeys = map[string]struct{}{
-	"esc": {},
-}
-
 func NewTmuxSession(name string) *TmuxSession {
 	return &TmuxSession{
 		Name:          name,
 		sanitizedName: removeWhitespace(name),
-		winchChan:     make(chan os.Signal, 1),
 	}
 }
 
-// SetWorkDir sets the working directory for the session
-func (t *TmuxSession) SetWorkDir(dir string) {
-	t.workDir = dir
-}
-
-// Start creates and starts a new detached tmux session
-func (t *TmuxSession) Start(command string) error {
+// Start creates and starts a new tmux session, then attaches to it. Program is the command to run in
+// the session (ex. claude). workdir is the git worktree directory.
+func (t *TmuxSession) Start(program string, workDir string) error {
 	// Check if the session already exists
 	if DoesSessionExist(t.sanitizedName) {
 		return fmt.Errorf("tmux session already exists: %s", t.sanitizedName)
 	}
 
 	// Create a new detached tmux session and start claude in it
-	var cmd *exec.Cmd
-	if t.workDir != "" {
-		cmd = exec.Command("tmux", "new-session", "-d", "-s", t.sanitizedName, "-c", t.workDir, command)
-	} else {
-		cmd = exec.Command("tmux", "new-session", "-d", "-s", t.sanitizedName, command)
-	}
+	cmd := exec.Command("tmux", "new-session", "-d", "-s", t.sanitizedName, "-c", workDir, program)
 
-	// Close existing PTY if it exists
-	if t.ptmx != nil {
-		t.ptmx.Close()
-		t.ptmx = nil
-	}
-
-	var err error
-	t.ptmx, err = pty.Start(cmd)
+	ptmx, err := pty.Start(cmd)
 	if err != nil {
-		// Cleanup any partially created session
+		// Cleanup any partially created session if any exists.
 		if DoesSessionExist(t.sanitizedName) {
 			cleanupCmd := exec.Command("tmux", "kill-session", "-t", t.sanitizedName)
 			if cleanupErr := cleanupCmd.Run(); cleanupErr != nil {
@@ -92,16 +81,24 @@ func (t *TmuxSession) Start(command string) error {
 		return fmt.Errorf("error starting tmux session: %w", err)
 	}
 
-	if err := t.updateWindowSize(); err != nil {
-		// Cleanup on window size update failure
-		if cleanupErr := t.Close(); cleanupErr != nil {
-			err = fmt.Errorf("%v (cleanup error: %v)", err, cleanupErr)
+	// We need to close the ptmx, but we shouldn't close it before the command above finishes.
+	// So, we poll for completion before closing.
+	timeout := time.After(2 * time.Second)
+	for !DoesSessionExist(t.sanitizedName) {
+		select {
+		case <-timeout:
+			// Cleanup on window size update failure
+			if cleanupErr := t.Close(); cleanupErr != nil {
+				err = fmt.Errorf("%v (cleanup error: %v)", err, cleanupErr)
+			}
+			return fmt.Errorf("timed out waiting for tmux session: %v", err)
+		default:
+			time.Sleep(time.Millisecond * 10)
 		}
-		return fmt.Errorf("error updating window size: %w", err)
 	}
+	ptmx.Close()
 
-	t.MonitorWindowSize(context.Background())
-	return nil
+	return t.Restore()
 }
 
 // Restore attaches to an existing session and restores the window size
@@ -110,73 +107,32 @@ func (t *TmuxSession) Restore() error {
 	if err != nil {
 		return fmt.Errorf("error opening PTY: %w", err)
 	}
-
-	// Store old PTY to cleanup if something goes wrong
-	oldPtmx := t.ptmx
 	t.ptmx = ptmx
-
-	if err := t.updateWindowSize(); err != nil {
-		// Restore old PTY and cleanup new one on failure
-		if oldPtmx != nil {
-			t.ptmx = oldPtmx
-		}
-		if cleanupErr := ptmx.Close(); cleanupErr != nil {
-			err = fmt.Errorf("%v (cleanup error: %v)", err, cleanupErr)
-		}
-		return fmt.Errorf("error updating window size: %w", err)
-	}
-
-	// Cleanup old PTY now that new one is successfully set up
-	if oldPtmx != nil {
-		oldPtmx.Close()
-	}
-
-	t.MonitorWindowSize(context.Background())
 	return nil
 }
 
-func (t *TmuxSession) Attach() (exited chan struct{}) {
+func (t *TmuxSession) Attach() (chan struct{}, error) {
+	oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
+	if err != nil {
+		return nil, fmt.Errorf("error making terminal raw: %v", err)
+	}
+	t.oldState = oldState
 	t.attachCh = make(chan struct{})
-	defer func() {
-		exited = t.attachCh
-	}()
 
-	attachCmd := exec.Command("tmux", "attach-session", "-t", t.sanitizedName)
+	t.wg = &sync.WaitGroup{}
+	t.wg.Add(1)
+	t.ctx, t.cancel = context.WithCancel(context.Background())
 
-	// Store old state to restore on failure
-	oldPtmx := t.ptmx
-	oldState := t.oldState
-
-	if oldPtmx != nil {
-		oldPtmx.Close()
-	}
-
-	var err error
-	t.ptmx, err = pty.Start(attachCmd)
-	if err != nil {
-		// Restore old state on failure
-		t.ptmx = oldPtmx
-		t.oldState = oldState
-		return
-	}
-
-	newState, err := term.MakeRaw(int(os.Stdin.Fd()))
-	if err != nil {
-		// Cleanup new PTY and restore old state on failure
-		if cleanupErr := t.ptmx.Close(); cleanupErr != nil {
-			err = fmt.Errorf("%v (cleanup error: %v)", err, cleanupErr)
-		}
-		t.ptmx = oldPtmx
-		t.oldState = oldState
-		return
-	}
-	t.oldState = newState
-
-	// TODO: goroutines may outlive Session.
+	// The first goroutine should terminate when the ptmx is closed. We use the
+	// waitgroup to wait for it to finish.
+	// The 2nd one returns when you press escape to Detach. It doesn't need to be
+	// in the waitgroup because is the goroutine doing the Detaching; it waits for
+	// all the other ones.
 	go func() {
-		// Copy tmux output to the local stdout.
+		defer t.wg.Done()
 		_, _ = io.Copy(os.Stdout, t.ptmx)
 	}()
+
 	go func() {
 		// Read input from stdin and check for escape key
 		buf := make([]byte, 32)
@@ -203,36 +159,40 @@ func (t *TmuxSession) Attach() (exited chan struct{}) {
 		}
 	}()
 
-	return
+	t.monitorWindowSize()
+	return t.attachCh, nil
 }
 
 // Detach disconnects from the current tmux session
-func (t *TmuxSession) Detach() error {
+func (t *TmuxSession) Detach() (err error) {
+	// TODO: control flow is a bit messy here. If there's an error,
+	// I'm not sure if we get into a bad state. Needs testing.
 	defer func() {
-		if t.attachCh != nil {
-			close(t.attachCh)
-			t.attachCh = nil
-		}
+		close(t.attachCh)
+		t.attachCh = nil
+		t.oldState = nil
+		t.cancel = nil
+		t.ctx = nil
+		t.wg = nil
 	}()
 
-	detachCmd := exec.Command("tmux", "detach-client", "-s", t.sanitizedName)
-	if err := detachCmd.Run(); err != nil {
-		return fmt.Errorf("error detaching from tmux session: %w", err)
+	// Close the attached pty session.
+	if err := t.ptmx.Close(); err != nil {
+		return fmt.Errorf("error closing attach pty session: %w", err)
+	}
+	// Attach goroutines should die on EOF due to the ptmx closing. Call
+	// t.Restore to set a new t.ptmx.
+	if err := t.Restore(); err != nil {
+		return err
+	}
+	// Yeild the stdin/stdout back to the UI.
+	if err := term.Restore(int(os.Stdin.Fd()), t.oldState); err != nil {
+		return fmt.Errorf("error restoring terminal state: %w", err)
 	}
 
-	if t.ptmx != nil {
-		if err := t.ptmx.Close(); err != nil {
-			return fmt.Errorf("error closing attach pty session: %w", err)
-		}
-		t.ptmx = nil
-	}
-
-	if t.oldState != nil {
-		if err := term.Restore(int(os.Stdin.Fd()), t.oldState); err != nil {
-			return fmt.Errorf("error restoring terminal state: %w", err)
-		}
-		t.oldState = nil
-	}
+	// Cancel goroutines created by Attach.
+	t.cancel()
+	t.wg.Wait()
 
 	return nil
 }
@@ -267,78 +227,79 @@ func (t *TmuxSession) Close() error {
 	return fmt.Errorf(errMsg)
 }
 
-// MonitorWindowSize monitors and handles window resize events
-func (t *TmuxSession) MonitorWindowSize(ctx context.Context) {
-	signal.Notify(t.winchChan, syscall.SIGWINCH)
-
+// monitorWindowSize monitors and handles window resize events while attached.
+func (t *TmuxSession) monitorWindowSize() {
+	winchChan := make(chan os.Signal)
+	signal.Notify(winchChan, syscall.SIGWINCH)
 	// Send initial SIGWINCH to trigger the first resize
 	syscall.Kill(syscall.Getpid(), syscall.SIGWINCH)
 
-	go func() {
-		debouncedWinch := make(chan os.Signal, 1)
-		defer signal.Stop(t.winchChan)
-
-		// Debounce resize events
-		go func() {
-			var resizeTimer *time.Timer
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case <-t.winchChan:
-					if resizeTimer != nil {
-						resizeTimer.Stop()
-					}
-					resizeTimer = time.AfterFunc(50*time.Millisecond, func() {
-						select {
-						case debouncedWinch <- syscall.SIGWINCH:
-						case <-ctx.Done():
-						}
-					})
-				}
+	doUpdate := func() {
+		// Use the current terminal height and width.
+		cols, rows, err := term.GetSize(int(os.Stdin.Fd()))
+		if err != nil {
+			log.Printf("failed to update window size: %v", err)
+		} else {
+			if err := t.updateWindowSize(cols, rows); err != nil {
+				log.Printf("failed to update window size: %v", err)
 			}
-		}()
+		}
+	}
+	// Do one at the end of the function to set the initial size.
+	defer doUpdate()
 
+	// Debounce resize events
+	t.wg.Add(2)
+	debouncedWinch := make(chan os.Signal, 1)
+	go func() {
+		defer t.wg.Done()
+		var resizeTimer *time.Timer
+		for {
+			select {
+			case <-t.ctx.Done():
+				return
+			case <-winchChan:
+				if resizeTimer != nil {
+					resizeTimer.Stop()
+				}
+				resizeTimer = time.AfterFunc(50*time.Millisecond, func() {
+					select {
+					case debouncedWinch <- syscall.SIGWINCH:
+					case <-t.ctx.Done():
+					}
+				})
+			}
+		}
+	}()
+	go func() {
+		defer t.wg.Done()
+		defer signal.Stop(winchChan)
 		// Handle resize events
 		for {
 			select {
-			case <-ctx.Done():
+			case <-t.ctx.Done():
 				return
 			case <-debouncedWinch:
-				if err := t.updateWindowSize(); err != nil {
-					log.Printf("failed to update window size: %v", err)
-				}
+				doUpdate()
 			}
 		}
 	}()
 }
 
-// updateWindowSize updates the window size of the PTY based on the current terminal dimensions
-func (t *TmuxSession) updateWindowSize() error {
-	if t.ptmx == nil {
-		return nil
-	}
+// SetDetachedSize set the width and height of the session while detached. This makes the
+// tmux output conform to the specified shape.
+func (t *TmuxSession) SetDetachedSize(width, height int) error {
+	return t.updateWindowSize(width, height)
+}
 
-	cols, rows, err := term.GetSize(int(os.Stdin.Fd()))
-	if err != nil {
-		return err
-	}
-
-	// Calculate the preview width as 70% of total width
-	previewWidth := int(float64(cols) * 0.7)
-	t.width = previewWidth
-
-	// Set the PTY size
-	if err := pty.Setsize(t.ptmx, &pty.Winsize{
+// updateWindowSize updates the window size of the PTY.
+func (t *TmuxSession) updateWindowSize(cols, rows int) error {
+	return pty.Setsize(t.ptmx, &pty.Winsize{
 		Rows: uint16(rows),
-		Cols: uint16(previewWidth), // Use preview width for the tmux pane
+		Cols: uint16(cols),
 		X:    0,
 		Y:    0,
-	}); err != nil {
-		return err
-	}
-
-	return nil
+	})
 }
 
 // DoesSessionExist checks if a tmux session exists

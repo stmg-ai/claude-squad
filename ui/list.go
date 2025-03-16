@@ -2,6 +2,7 @@ package ui
 
 import (
 	"claude-squad/session"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -28,7 +29,8 @@ var selectedDescStyle = selectedTitleStyle.Foreground(lipgloss.AdaptiveColor{Lig
 
 var mainTitle = lipgloss.NewStyle().
 	Background(lipgloss.Color("62")).
-	Foreground(lipgloss.Color("230"))
+	Foreground(lipgloss.Color("230")).
+	MarginTop(1)
 
 type List struct {
 	items         []*session.Instance
@@ -48,6 +50,17 @@ func NewList(spinner *spinner.Model) *List {
 func (l *List) SetSize(width, height int) {
 	l.width = width
 	l.height = height
+}
+
+// SetSessionPreviewSize sets the height and width for the
+func (l *List) SetSessionPreviewSize(width, height int) (err error) {
+	for i, item := range l.items {
+		if innerErr := item.SetPreviewSize(width, height); innerErr != nil {
+			err = errors.Join(
+				err, fmt.Errorf("could not set preview size for instance %d: %v", i, innerErr))
+		}
+	}
+	return
 }
 
 func (l *List) NumInstances() int {
@@ -147,7 +160,7 @@ func (l *List) Kill() {
 	l.items = append(l.items[:l.selectedIdx], l.items[l.selectedIdx+1:]...)
 }
 
-func (l *List) Attach() chan struct{} {
+func (l *List) Attach() (chan struct{}, error) {
 	targetInstance := l.items[l.selectedIdx]
 	return targetInstance.Attach()
 }
