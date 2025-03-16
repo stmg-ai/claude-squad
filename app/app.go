@@ -153,22 +153,30 @@ func (m *home) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m *home) handleQuit() (tea.Model, tea.Cmd) {
+	if err := m.storage.SaveInstances(m.list.GetInstances()); err != nil {
+		return m.showErrorMessageForShortTime(err)
+	}
+	m.quitting = true
+	return m, tea.Quit
+}
+
 func (m *home) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.inputDisabled {
 		return m, nil
 	}
+
+	// Handle quit commands first
+	if msg.String() == "ctrl+c" || msg.String() == "q" {
+		return m.handleQuit()
+	}
+
 	name, ok := keys.GlobalKeyStringsMap[msg.String()]
 	if !ok {
 		return m, nil
 	}
+
 	switch name {
-	case keys.KeyQuit:
-		// Save instances before quitting
-		if err := m.storage.SaveInstances(m.list.GetInstances()); err != nil {
-			return m.showErrorMessageForShortTime(err)
-		}
-		m.quitting = true
-		return m, tea.Quit
 	case keys.KeyUp:
 		m.list.Up()
 		return m.updatePreview()
