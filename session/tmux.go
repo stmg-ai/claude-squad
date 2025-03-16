@@ -178,8 +178,29 @@ func (t *TmuxSession) Attach() (exited chan struct{}) {
 		_, _ = io.Copy(os.Stdout, t.ptmx)
 	}()
 	go func() {
-		// Copy tmux output to the local stdout.
-		_, _ = io.Copy(t.ptmx, os.Stdin)
+		// Read input from stdin and check for escape key
+		buf := make([]byte, 32)
+		for {
+			nr, err := os.Stdin.Read(buf)
+			if err != nil {
+				if err == io.EOF {
+					break
+				}
+				continue
+			}
+
+			// Check for escape key (ASCII 27)
+			if nr == 1 && buf[0] == 27 {
+				// Detach from the session
+				if err := t.Detach(); err != nil {
+					log.Printf("Error detaching from tmux session: %v", err)
+				}
+				return
+			}
+
+			// Forward other input to tmux
+			_, _ = t.ptmx.Write(buf[:nr])
+		}
 	}()
 
 	return
