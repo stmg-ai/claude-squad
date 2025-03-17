@@ -56,9 +56,8 @@ func (i *Instance) ToInstanceData() InstanceData {
 // FromInstanceData creates a new Instance from serialized data
 func FromInstanceData(data InstanceData) (*Instance, error) {
 	instance, err := NewInstance(InstanceOptions{
-		Title:              data.Title,
-		Path:               data.Path,
-		RestoreFromStorage: true,
+		Title: data.Title,
+		Path:  data.Path,
 	})
 	if err != nil {
 		return nil, err
@@ -77,8 +76,6 @@ type InstanceOptions struct {
 	Title string
 	// Path is the path to the workspace.
 	Path string
-	// RestoreFromStorage indicates this is being restored from storage, skip tmux operations
-	RestoreFromStorage bool
 }
 
 func NewInstance(opts InstanceOptions) (*Instance, error) {
@@ -88,20 +85,6 @@ func NewInstance(opts InstanceOptions) (*Instance, error) {
 
 	tmuxSession := NewTmuxSession(opts.Title)
 	gitWorktree := git.NewGitWorktree(opts.Path, opts.Title)
-
-	// If restoring from storage, create instance without tmux operations
-	if opts.RestoreFromStorage {
-		now := time.Now()
-		return &Instance{
-			Title:       opts.Title,
-			Path:        opts.Path,
-			Status:      Loading,
-			tmuxSession: tmuxSession,
-			gitWorktree: gitWorktree,
-			CreatedAt:   now,
-			UpdatedAt:   now,
-		}, nil
-	}
 
 	// Create instance first so we can use its cleanup methods
 	now := time.Now()
@@ -140,11 +123,8 @@ func NewInstance(opts InstanceOptions) (*Instance, error) {
 			return nil, setupErr
 		}
 
-		// Set the working directory for the tmux session to the git worktree path
-		tmuxSession.SetWorkDir(gitWorktree.GetWorktreePath())
-
 		// Create new session
-		if err := tmuxSession.Start("aider --model ollama_chat/gemma3:1b"); err != nil {
+		if err := tmuxSession.Start("claude", gitWorktree.GetWorktreePath()); err != nil {
 			// Cleanup git worktree if tmux session creation fails
 			if cleanupErr := gitWorktree.Cleanup(); cleanupErr != nil {
 				err = fmt.Errorf("%v (cleanup error: %v)", err, cleanupErr)
@@ -200,8 +180,12 @@ func (i *Instance) Preview() (string, error) {
 	return i.tmuxSession.CapturePaneContent()
 }
 
-func (i *Instance) Attach() chan struct{} {
+func (i *Instance) Attach() (chan struct{}, error) {
 	return i.tmuxSession.Attach()
+}
+
+func (i *Instance) SetPreviewSize(width, height int) error {
+	return i.tmuxSession.SetDetachedSize(width, height)
 }
 
 // GetGitWorktree returns the git worktree for the instance

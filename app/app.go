@@ -6,6 +6,7 @@ import (
 	"claude-squad/ui"
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"time"
 
@@ -112,6 +113,9 @@ func (m *home) updateHandleWindowSizeEvent(msg tea.WindowSizeMsg) {
 
 	m.preview.SetSize(previewWidth, contentHeight)
 	m.list.SetSize(listWidth, contentHeight)
+	if err := m.list.SetSessionPreviewSize(ui.AdjustPreviewWidth(previewWidth), 40); err != nil {
+		log.Println(err)
+	}
 	m.menu.SetSize(msg.Width, menuHeight)
 }
 
@@ -236,7 +240,14 @@ func (m *home) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	// TODO: add more key bindings
 	case keys.KeyEnter:
-		<-m.list.Attach()
+		if m.list.NumInstances() == 0 {
+			return m, nil
+		}
+		ch, err := m.list.Attach()
+		if err != nil {
+			return m.showErrorMessageForShortTime(err)
+		}
+		<-ch
 		// WindowSize clears the screen.
 		return m, tea.WindowSize()
 	default:

@@ -20,15 +20,19 @@ type PreviewPane struct {
 	text string
 }
 
+// AdjustPreviewWidth adjusts the width of the preview pane to be 90% of the provided width.
+func AdjustPreviewWidth(width int) int {
+	return int(float64(width) * 0.9)
+}
+
 func NewPreviewPane(width, maxHeight int) *PreviewPane {
 	// Use 70% of the provided width
-	adjustedWidth := int(float64(width) * 0.7)
+	adjustedWidth := AdjustPreviewWidth(width)
 	return &PreviewPane{width: adjustedWidth, maxHeight: maxHeight}
 }
 
 func (p *PreviewPane) SetSize(width, maxHeight int) {
-	// Use 70% of the provided width
-	p.width = int(float64(width) * 0.7)
+	p.width = AdjustPreviewWidth(width)
 	p.maxHeight = maxHeight
 }
 
@@ -63,7 +67,7 @@ func (p *PreviewPane) String() string {
 	}
 
 	// Calculate available height accounting for border and margin
-	availableHeight := p.maxHeight - 3 // 2 for borders, 1 for margin
+	availableHeight := p.maxHeight - 3 - 4 // 2 for borders, 1 for margin, 1 for ellipsis
 
 	// Split the raw text into lines first, preserving ANSI codes
 	lines := strings.Split(p.text, "\n")
