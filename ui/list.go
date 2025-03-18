@@ -12,9 +12,13 @@ import (
 )
 
 const readyIcon = "● "
+const pausedIcon = "⏸ "
 
 var readyStyle = lipgloss.NewStyle().
 	Foreground(lipgloss.AdaptiveColor{Light: "#51bd73", Dark: "#51bd73"})
+
+var pausedStyle = lipgloss.NewStyle().
+	Foreground(lipgloss.AdaptiveColor{Light: "#888888", Dark: "#888888"})
 
 var spinnerStyle = lipgloss.NewStyle().
 	Foreground(lipgloss.AdaptiveColor{Light: "#1a1a1a", Dark: "#dddddd"})
@@ -110,15 +114,18 @@ func (r *InstanceRenderer) Render(i *session.Instance, idx int, selected bool) s
 
 	// add spinner next to title if it's running
 	var join string
+	var title = fmt.Sprintf("%s %s", prefix, i.Title)
 	switch i.Status {
 	case session.Running:
 		join = fmt.Sprintf("%s ", r.spinner.View())
 	case session.Ready:
 		join = readyStyle.Render(readyIcon)
+	case session.Paused:
+		join = pausedStyle.Render(pausedIcon)
 	default:
 	}
 
-	title := titleS.Render(
+	title = titleS.Render(
 		lipgloss.JoinHorizontal(
 			lipgloss.Left,
 			lipgloss.Place(r.width-3, 1, lipgloss.Left, lipgloss.Center, fmt.Sprintf("%s %s", prefix, i.Title)),

@@ -15,10 +15,13 @@ const (
 	KeyQuit
 	KeyReview
 	KeyPush
-	KeyTab // Tab is a special keybinding for switching between panes.
+	KeySubmit
 
-	// SubmitName is a special keybinding for submitting the name of a new instance.
-	KeySubmitName
+	KeyTab // Tab is a special keybinding for switching between panes.
+	KeySubmitName // SubmitName is a special keybinding for submitting the name of a new instance.
+
+	KeyPause
+	KeyResume
 )
 
 // GlobalKeyStringsMap is a global, immutable map string to keybinding.
@@ -32,9 +35,10 @@ var GlobalKeyStringsMap = map[string]KeyName{
 	"n":     KeyNew,
 	"d":     KeyKill,
 	"q":     KeyQuit,
-	"r":     KeyReview,
-	"p":     KeyPush,
 	"tab":   KeyTab,
+	"p":     KeyPause,
+	"r":     KeyResume,
+	"s":     KeySubmit,
 }
 
 // GlobalkeyBindings is a global, immutable map of KeyName tot keybinding.
@@ -49,7 +53,7 @@ var GlobalkeyBindings = map[KeyName]key.Binding{
 	),
 	KeyEnter: key.NewBinding(
 		key.WithKeys("enter", "o"),
-		key.WithHelp("o", "open"),
+		key.WithHelp("⏎/o", "open"),
 	),
 	KeyNew: key.NewBinding(
 		key.WithKeys("n"),
@@ -63,18 +67,25 @@ var GlobalkeyBindings = map[KeyName]key.Binding{
 		key.WithKeys("q"),
 		key.WithHelp("q", "quit"),
 	),
-	KeyReview: key.NewBinding(
-		key.WithKeys("r"),
-		key.WithHelp("r", "review"),
+	KeySubmit: key.NewBinding(
+		key.WithKeys("s"),
+		key.WithHelp("s", "submit"),
 	),
-	KeyPush: key.NewBinding(
+	KeyPause: key.NewBinding(
 		key.WithKeys("p"),
-		key.WithHelp("p", "push branch"),
+		key.WithHelp("p", "pause"),
 	),
 	KeyTab: key.NewBinding(
 		key.WithKeys("tab"),
 		key.WithHelp("tab", "switch tab"),
 	),
+	KeyResume: key.NewBinding(
+		key.WithKeys("r"),
+		key.WithHelp("r", "resume"),
+	),
+	
+	// -- Special keybindings --
+	
 	KeySubmitName: key.NewBinding(
 		key.WithKeys("enter"),
 		key.WithHelp("enter", "submit name"),

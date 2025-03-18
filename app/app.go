@@ -180,7 +180,7 @@ func (m *home) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 			defer func() {
 				m.state = stateDefault
-				m.menu.SetOptions(ui.StartMenuOptions)
+				m.menu.SetState(ui.StateDefault)
 			}()
 			if err := instance.Start(false); err != nil {
 				m.list.Kill()
@@ -253,20 +253,22 @@ func (m *home) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m.showErrorMessageForShortTime(
 				fmt.Errorf("you can't create more than %d instances", GlobalInstanceLimit))
 		}
-		instance := session.NewInstance(session.InstanceOptions{
+		instance, err := session.NewInstance(session.InstanceOptions{
 			Title:   "",
 			Path:    ".",
 			Program: m.program,
 		})
+		if err != nil {
+			return m.showErrorMessageForShortTime(err)
+		}
+
 		m.list.AddInstance(instance)
 		m.list.SetSelectedInstance(m.list.NumInstances() - 1)
 		m.state = stateNew
-		m.menu.SetOptions([]keys.KeyName{
-			keys.KeySubmitName,
-		})
+		m.menu.SetState(ui.StateNewInstance)
 
 		return m, nil
-	case keys.KeyPush:
+	case keys.KeySubmit:
 		selected := m.list.GetSelectedInstance()
 		if selected == nil {
 			return m, nil
@@ -283,7 +285,24 @@ func (m *home) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 		return m, nil
-	// TODO: add more key bindings
+	case keys.KeyPause:
+		selected := m.list.GetSelectedInstance()
+		if selected == nil {
+			return m, nil
+		}
+		if err := selected.Pause(); err != nil {
+			return m.showErrorMessageForShortTime(err)
+		}
+		return m.updatePreview()
+	case keys.KeyResume:
+		selected := m.list.GetSelectedInstance()
+		if selected == nil {
+			return m, nil
+		}
+		if err := selected.Resume(); err != nil {
+			return m.showErrorMessageForShortTime(err)
+		}
+		return m.updatePreview()
 	case keys.KeyEnter:
 		if m.list.NumInstances() == 0 {
 			return m, nil
@@ -302,9 +321,14 @@ func (m *home) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // updatePreview updates the preview pane with the currently selected instance
 func (m *home) updatePreview() (tea.Model, tea.Cmd) {
-	if err := m.tabbedWindow.UpdatePreview(m.list.GetSelectedInstance()); err != nil {
+	selected := m.list.GetSelectedInstance()
+
+	if err := m.tabbedWindow.UpdatePreview(selected); err != nil {
 		return m.showErrorMessageForShortTime(err)
 	}
+
+	// Update menu with current instance
+	m.menu.SetInstance(selected)
 	return m, nil
 }
 
@@ -331,8 +355,9 @@ func (m *home) showErrorMessageForShortTime(err error) (tea.Model, tea.Cmd) {
 }
 
 func (m *home) View() string {
+	listWithPadding := lipgloss.NewStyle().PaddingTop(1).Render(m.list.String())
 	previewWithPadding := lipgloss.NewStyle().PaddingTop(1).Render(m.tabbedWindow.String())
-	listAndPreview := lipgloss.JoinHorizontal(lipgloss.Top, m.list.String(), previewWithPadding)
+	listAndPreview := lipgloss.JoinHorizontal(lipgloss.Top, listWithPadding, previewWithPadding)
 
 	return lipgloss.JoinVertical(
 		lipgloss.Center,
