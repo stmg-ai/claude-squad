@@ -1,6 +1,7 @@
 package session
 
 import (
+	"claude-squad/config"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -28,12 +29,11 @@ type Storage struct {
 
 // NewStorage creates a new storage instance
 func NewStorage() (*Storage, error) {
-	homeDir, err := os.UserHomeDir()
+	dir, err := config.GetConfigDir()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get home directory: %w", err)
+		return nil, fmt.Errorf("failed to get config directory: %w", err)
 	}
 
-	dir := filepath.Join(homeDir, ".claude-squad")
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create directory: %w", err)
 	}

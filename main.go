@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"os"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
@@ -63,8 +62,10 @@ var (
 				return fmt.Errorf("failed to load config: %w", err)
 			}
 
-			homeDir, _ := os.UserHomeDir()
-			configDir := filepath.Join(homeDir, ".claude-squad")
+			configDir, err := config.GetConfigDir()
+			if err != nil {
+				return fmt.Errorf("failed to get config directory: %w", err)
+			}
 			configJson, _ := json.MarshalIndent(cfg, "", "  ")
 
 			fmt.Printf("Config: %s\n%s\n", filepath.Join(configDir, "config.json"), configJson)

@@ -8,6 +8,15 @@ import (
 	"path/filepath"
 )
 
+// GetConfigDir returns the path to the application's configuration directory
+func GetConfigDir() (string, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("failed to get home directory: %w", err)
+	}
+	return filepath.Join(homeDir, ".claude-squad"), nil
+}
+
 // Config represents the application configuration
 type Config struct {
 	// DefaultProgram is the default program to run in new instances
@@ -23,12 +32,12 @@ func DefaultConfig() *Config {
 
 // LoadConfig loads the configuration from disk
 func LoadConfig() (*Config, error) {
-	homeDir, err := os.UserHomeDir()
+	configDir, err := GetConfigDir()
 	if err != nil {
-		return DefaultConfig(), fmt.Errorf("failed to get home directory: %w", err)
+		return nil, fmt.Errorf("failed to get config directory: %w", err)
 	}
 
-	configPath := filepath.Join(homeDir, ".claude-squad", "config.json")
+	configPath := filepath.Join(configDir, "config.json")
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -52,12 +61,11 @@ func LoadConfig() (*Config, error) {
 
 // SaveConfig saves the configuration to disk
 func SaveConfig(config *Config) error {
-	homeDir, err := os.UserHomeDir()
+	configDir, err := GetConfigDir()
 	if err != nil {
-		return fmt.Errorf("failed to get home directory: %w", err)
+		return fmt.Errorf("failed to get config directory: %w", err)
 	}
 
-	configDir := filepath.Join(homeDir, ".claude-squad")
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
