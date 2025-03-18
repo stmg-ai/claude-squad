@@ -39,7 +39,7 @@ const (
 type home struct {
 	ctx context.Context
 
-	quitting bool
+	program string
 
 	// ui components
 	list    *ui.List
@@ -52,14 +52,8 @@ type home struct {
 	// storage
 	storage *session.Storage
 
-	// input
-	inputDisabled bool
-
 	// state
-	windowWidth  int
-	windowHeight int
-	state        state
-	program      string
+	state state
 }
 
 func newHome(ctx context.Context, program string) *home {
@@ -82,6 +76,7 @@ func newHome(ctx context.Context, program string) *home {
 		preview: ui.NewPreviewPane(0, 0),
 		storage: storage,
 		program: program,
+		state:   stateDefault,
 	}
 	h.list = ui.NewList(&h.spinner)
 
@@ -103,8 +98,6 @@ func newHome(ctx context.Context, program string) *home {
 // updateHandleWindowSizeEvent sets the sizes of the components.
 // The components will try to render inside their bounds.
 func (m *home) updateHandleWindowSizeEvent(msg tea.WindowSizeMsg) {
-	m.windowWidth, m.windowHeight = msg.Width, msg.Height
-
 	// List takes 30% of width, preview takes 70%
 	listWidth := int(float32(msg.Width) * 0.3)
 	previewWidth := msg.Width - listWidth
@@ -165,18 +158,60 @@ func (m *home) handleQuit() (tea.Model, tea.Cmd) {
 	if err := m.storage.SaveInstances(m.list.GetInstances()); err != nil {
 		return m.showErrorMessageForShortTime(err)
 	}
-	m.quitting = true
 	return m, tea.Quit
 }
 
 func (m *home) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	if m.inputDisabled {
-		return m, nil
-	}
-
 	// Handle quit commands first
 	if msg.String() == "ctrl+c" || msg.String() == "q" {
 		return m.handleQuit()
+	}
+
+	switch m.state {
+	case stateNew:
+		instance := m.list.GetInstances()[m.list.NumInstances()-1]
+		switch msg.Type {
+		// Start the instance (enable previews etc) and go back to the main menu state.
+		case tea.KeyEnter:
+			if len(instance.Title) == 0 {
+				return m.showErrorMessageForShortTime(fmt.Errorf("title cannot be empty"))
+			}
+
+			defer func() {
+				m.state = stateDefault
+				m.menu.SetOptions(ui.StartMenuOptions)
+			}()
+			if err := instance.Start(false); err != nil {
+				m.list.Kill()
+				return m.showErrorMessageForShortTime(err)
+			}
+			// Save after adding new instance
+			if err := m.storage.SaveInstances(m.list.GetInstances()); err != nil {
+				return m.showErrorMessageForShortTime(err)
+			}
+			return m, tea.WindowSize()
+		case tea.KeyRunes:
+			if len(instance.Title) >= 20 {
+				return m.showErrorMessageForShortTime(fmt.Errorf("title cannot be longer than 32 characters"))
+			}
+			if err := instance.SetTitle(instance.Title + string(msg.Runes)); err != nil {
+				return m.showErrorMessageForShortTime(err)
+			}
+		case tea.KeyBackspace:
+			if len(instance.Title) == 0 {
+				return m, nil
+			}
+			if err := instance.SetTitle(instance.Title[:len(instance.Title)-1]); err != nil {
+				return m.showErrorMessageForShortTime(err)
+			}
+		case tea.KeySpace:
+			if err := instance.SetTitle(instance.Title + "-"); err != nil {
+				return m.showErrorMessageForShortTime(err)
+			}
+		default:
+		}
+		return m, nil
+	default:
 	}
 
 	name, ok := keys.GlobalKeyStringsMap[msg.String()]
@@ -210,21 +245,17 @@ func (m *home) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m.showErrorMessageForShortTime(
 				fmt.Errorf("you can't create more than %d instances", GlobalInstanceLimit))
 		}
-
 		instance := session.NewInstance(session.InstanceOptions{
-			Title:   fmt.Sprintf("instance-%d", m.list.NumInstances()+1),
+			Title:   "",
 			Path:    ".",
 			Program: m.program,
 		})
-		if err := instance.Start(); err != nil {
-			return m.showErrorMessageForShortTime(err)
-		}
 		m.list.AddInstance(instance)
-
-		// Save after adding new instance
-		if err := m.storage.SaveInstances(m.list.GetInstances()); err != nil {
-			return m.showErrorMessageForShortTime(err)
-		}
+		m.list.SetSelectedInstance(m.list.NumInstances() - 1)
+		m.state = stateNew
+		m.menu.SetOptions([]keys.KeyName{
+			keys.KeySubmitName,
+		})
 
 		return m, nil
 	case keys.KeyPush:
@@ -235,8 +266,11 @@ func (m *home) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 		// Default commit message with timestamp
 		commitMsg := fmt.Sprintf("Update from session %s at %s", selected.Title, time.Now().Format(time.RFC3339))
-
-		if err := selected.GetGitWorktree().PushChanges(commitMsg); err != nil {
+		worktree, err := selected.GetGitWorktree()
+		if err != nil {
+			return m.showErrorMessageForShortTime(err)
+		}
+		if err = worktree.PushChanges(commitMsg); err != nil {
 			return m.showErrorMessageForShortTime(err)
 		}
 

@@ -15,6 +15,9 @@ const (
 	KeyQuit
 	KeyReview
 	KeyPush
+
+	// SubmitName is a special keybinding for submitting the name of a new instance.
+	KeySubmitName
 )
 
 // GlobalKeyStringsMap is a global, immutable map string to keybinding.
@@ -65,5 +68,9 @@ var GlobalkeyBindings = map[KeyName]key.Binding{
 	KeyPush: key.NewBinding(
 		key.WithKeys("p"),
 		key.WithHelp("p", "push branch"),
+	),
+	KeySubmitName: key.NewBinding(
+		key.WithKeys("enter"),
+		key.WithHelp("enter", "submit name"),
 	),
 }

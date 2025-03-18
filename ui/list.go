@@ -4,6 +4,7 @@ import (
 	"claude-squad/session"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/spinner"
@@ -55,6 +56,10 @@ func (l *List) SetSize(width, height int) {
 // SetSessionPreviewSize sets the height and width for the
 func (l *List) SetSessionPreviewSize(width, height int) (err error) {
 	for i, item := range l.items {
+		if !item.Started() {
+			continue
+		}
+
 		if innerErr := item.SetPreviewSize(width, height); innerErr != nil {
 			err = errors.Join(
 				err, fmt.Errorf("could not set preview size for instance %d: %v", i, innerErr))
@@ -148,8 +153,7 @@ func (l *List) Kill() {
 
 	// Kill the tmux session
 	if err := targetInstance.Kill(); err != nil {
-		// TODO: handle error
-		return
+		log.Printf("could not kill instance: %v", err)
 	}
 
 	// If you delete the last one in the list, select the previous one.
@@ -186,6 +190,14 @@ func (l *List) GetSelectedInstance() *session.Instance {
 		return nil
 	}
 	return l.items[l.selectedIdx]
+}
+
+// SetSelectedInstance sets the selected index. Noop if the index is out of bounds.
+func (l *List) SetSelectedInstance(idx int) {
+	if idx >= len(l.items) {
+		return
+	}
+	l.selectedIdx = idx
 }
 
 // GetInstances returns all instances in the list

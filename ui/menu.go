@@ -32,10 +32,16 @@ type Menu struct {
 	height, width int
 }
 
+var StartMenuOptions = []keys.KeyName{keys.KeyNew, keys.KeyKill, keys.KeyEnter, keys.KeyPush, keys.KeyQuit}
+
 func NewMenu() *Menu {
 	return &Menu{
-		options: []keys.KeyName{keys.KeyNew, keys.KeyKill, keys.KeyEnter, keys.KeyPush, keys.KeyQuit},
+		options: StartMenuOptions,
 	}
+}
+
+func (m *Menu) SetOptions(options []keys.KeyName) {
+	m.options = options
 }
 
 // SetSize sets the width of the window. The menu will be centered horizontally within this width.

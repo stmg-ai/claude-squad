@@ -75,6 +75,11 @@ func (p *PreviewPane) String() string {
 		lines = lines[:availableHeight]
 		lines = append(lines, "...")
 	}
+	if len(lines) < availableHeight && availableHeight > 0 {
+		for len(lines) < availableHeight {
+			lines = append(lines, "\n")
+		}
+	}
 
 	// Join lines and wrap in preview pane style while preserving ANSI codes
 	content := strings.Join(lines, "\n")

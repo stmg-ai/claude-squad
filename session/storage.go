@@ -61,9 +61,11 @@ func (s *Storage) SaveInstances(instances []*Instance) error {
 	}
 
 	// Convert and save instances
-	data := make([]InstanceData, len(instances))
-	for i, instance := range instances {
-		data[i] = instance.ToInstanceData()
+	data := make([]InstanceData, 0)
+	for _, instance := range instances {
+		if instance.Started() {
+			data = append(data, instance.ToInstanceData())
+		}
 	}
 
 	jsonData, err := json.MarshalIndent(data, "", "  ")
