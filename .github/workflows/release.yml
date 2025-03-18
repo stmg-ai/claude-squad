@@ -1,0 +1,98 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    name: Build Release Binaries
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [linux, darwin, windows]
+        goarch: [amd64, arm64]
+        exclude:
+          - goos: windows
+            goarch: arm64
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+        cache: true
+
+    - name: Run tests
+      run: go test -v ./...
+
+    - name: Build
+      env:
+        GOOS: ${{ matrix.goos }}
+        GOARCH: ${{ matrix.goarch }}
+      run: |
+        BINARY_NAME=claude-squad
+        if [ "${{ matrix.goos }}" = "windows" ]; then
+          BINARY_NAME=$BINARY_NAME.exe
+        fi
+        go build -v -o build/${{ matrix.goos }}_${{ matrix.goarch }}/$BINARY_NAME
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: claude-squad-${{ matrix.goos }}-${{ matrix.goarch }}
+        path: build/${{ matrix.goos }}_${{ matrix.goarch }}/*
+        retention-days: 7
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate Changelog
+        id: changelog
+        run: |
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -z "$PREVIOUS_TAG" ]; then
+            # If no previous tag exists, get all commits
+            echo "changelog<<EOF" >> $GITHUB_OUTPUT
+            git log --pretty=format:"* %s" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            # Get commits since last tag
+            echo "changelog<<EOF" >> $GITHUB_OUTPUT
+            git log --pretty=format:"* %s" $PREVIOUS_TAG..HEAD >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Prepare binaries
+          cd artifacts
+          for dir in */; do
+            cd "$dir"
+            zip -r "../${dir%/}.zip" .
+            cd ..
+          done
+          
+          # Create release
+          gh release create ${{ github.ref_name }} \
+            --title "Release ${{ github.ref_name }}" \
+            --notes "${{ steps.changelog.outputs.changelog }}" \
+            *.zip 
