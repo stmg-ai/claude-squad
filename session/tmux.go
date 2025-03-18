@@ -229,7 +229,7 @@ func (t *TmuxSession) Close() error {
 
 // monitorWindowSize monitors and handles window resize events while attached.
 func (t *TmuxSession) monitorWindowSize() {
-	winchChan := make(chan os.Signal)
+	winchChan := make(chan os.Signal, 1)
 	signal.Notify(winchChan, syscall.SIGWINCH)
 	// Send initial SIGWINCH to trigger the first resize
 	syscall.Kill(syscall.Getpid(), syscall.SIGWINCH)
