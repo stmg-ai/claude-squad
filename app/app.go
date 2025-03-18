@@ -18,8 +18,8 @@ import (
 const GlobalInstanceLimit = 10
 
 // Run is the main entrypoint into the application.
-func Run(ctx context.Context) {
-	p := tea.NewProgram(newHome(ctx), tea.WithAltScreen())
+func Run(ctx context.Context, program string) {
+	p := tea.NewProgram(newHome(ctx, program), tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -59,9 +59,10 @@ type home struct {
 	windowWidth  int
 	windowHeight int
 	state        state
+	program      string
 }
 
-func newHome(ctx context.Context) *home {
+func newHome(ctx context.Context, program string) *home {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
@@ -80,6 +81,7 @@ func newHome(ctx context.Context) *home {
 		errBox:  ui.NewErrBox(),
 		preview: ui.NewPreviewPane(0, 0),
 		storage: storage,
+		program: program,
 	}
 	h.list = ui.NewList(&h.spinner)
 
@@ -210,8 +212,9 @@ func (m *home) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 		instance, err := session.NewInstance(session.InstanceOptions{
-			Title: fmt.Sprintf("instance-%d", m.list.NumInstances()+1),
-			Path:  ".",
+			Title:   fmt.Sprintf("instance-%d", m.list.NumInstances()+1),
+			Path:    ".",
+			Program: m.program,
 		})
 		if err != nil {
 			return m.showErrorMessageForShortTime(err)

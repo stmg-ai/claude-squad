@@ -17,6 +17,7 @@ type InstanceData struct {
 	Width     int
 	CreatedAt time.Time
 	UpdatedAt time.Time
+	Program   string
 }
 
 // Storage handles saving and loading instances

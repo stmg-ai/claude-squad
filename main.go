@@ -2,23 +2,34 @@ package main
 
 import (
 	"claude-squad/app"
+	"claude-squad/config"
 	"claude-squad/logger"
 	"claude-squad/session"
 	"context"
+	"encoding/json"
 	"fmt"
-	"github.com/spf13/cobra"
 	"log"
+	"os"
+	"path/filepath"
+
+	"github.com/spf13/cobra"
 )
 
 var (
-	resetFlag bool
-	rootCmd   = &cobra.Command{
+	resetFlag   bool
+	programFlag string
+	rootCmd     = &cobra.Command{
 		Use:   "claude-squad",
 		Short: "Claude Squad - A terminal-based session manager",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()
 			logger.Initialize()
 			defer logger.Close()
+
+			cfg, err := config.LoadConfig()
+			if err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
+			}
 
 			if resetFlag {
 				storage, err := session.NewStorage()
@@ -32,7 +43,31 @@ var (
 				return nil
 			}
 
-			app.Run(ctx)
+			// Program flag overrides config
+			program := cfg.DefaultProgram
+			if programFlag != "" {
+				program = programFlag
+			}
+
+			app.Run(ctx, program)
+			return nil
+		},
+	}
+
+	debugCmd = &cobra.Command{
+		Use:   "debug",
+		Short: "Print debug information like config paths",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := config.LoadConfig()
+			if err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
+			}
+
+			homeDir, _ := os.UserHomeDir()
+			configDir := filepath.Join(homeDir, ".claude-squad")
+			configJson, _ := json.MarshalIndent(cfg, "", "  ")
+
+			fmt.Printf("Config: %s\n%s\n", filepath.Join(configDir, "config.json"), configJson)
 			return nil
 		},
 	}
@@ -40,6 +75,8 @@ var (
 
 func init() {
 	rootCmd.Flags().BoolVar(&resetFlag, "reset", false, "Reset all stored instances")
+	rootCmd.Flags().StringVarP(&programFlag, "program", "p", "", "Program to run in new instances (e.g. 'aider --model ollama_chat/gemma3:1b')")
+	rootCmd.AddCommand(debugCmd)
 }
 
 func main() {

@@ -30,5 +30,6 @@ func Initialize() {
 
 func Close() {
 	_ = globalLogFile.Close()
+	// TODO: maybe only print if verbose flag is set?
 	fmt.Println("wrote logs to " + logFileName)
 }

@@ -34,6 +34,8 @@ type Instance struct {
 	CreatedAt time.Time
 	// UpdatedAt is the time the instance was last updated.
 	UpdatedAt time.Time
+	// Program is the program to run in the instance.
+	Program string
 	// tmuxSession is the tmux session for the instance.
 	tmuxSession *TmuxSession
 	// gitWorktree is the git worktree for the instance.
@@ -49,15 +51,17 @@ func (i *Instance) ToInstanceData() InstanceData {
 		Height:    i.Height,
 		Width:     i.Width,
 		CreatedAt: i.CreatedAt,
-		UpdatedAt: time.Now(), // Update timestamp when saving
+		UpdatedAt: time.Now(),
+		Program:   i.Program,
 	}
 }
 
 // FromInstanceData creates a new Instance from serialized data
 func FromInstanceData(data InstanceData) (*Instance, error) {
 	instance, err := NewInstance(InstanceOptions{
-		Title: data.Title,
-		Path:  data.Path,
+		Title:   data.Title,
+		Path:    data.Path,
+		Program: data.Program,
 	})
 	if err != nil {
 		return nil, err
@@ -76,6 +80,8 @@ type InstanceOptions struct {
 	Title string
 	// Path is the path to the workspace.
 	Path string
+	// Program is the program to run in the instance (e.g. "claude", "aider --model ollama_chat/gemma3:1b")
+	Program string
 }
 
 func NewInstance(opts InstanceOptions) (*Instance, error) {
@@ -96,6 +102,7 @@ func NewInstance(opts InstanceOptions) (*Instance, error) {
 		gitWorktree: gitWorktree,
 		CreatedAt:   now,
 		UpdatedAt:   now,
+		Program:     opts.Program,
 	}
 
 	// Setup error handler to cleanup resources on any error
@@ -124,7 +131,7 @@ func NewInstance(opts InstanceOptions) (*Instance, error) {
 		}
 
 		// Create new session
-		if err := tmuxSession.Start("claude", gitWorktree.GetWorktreePath()); err != nil {
+		if err := tmuxSession.Start(opts.Program, gitWorktree.GetWorktreePath()); err != nil {
 			// Cleanup git worktree if tmux session creation fails
 			if cleanupErr := gitWorktree.Cleanup(); cleanupErr != nil {
 				err = fmt.Errorf("%v (cleanup error: %v)", err, cleanupErr)
