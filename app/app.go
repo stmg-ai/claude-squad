@@ -211,12 +211,12 @@ func (m *home) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				fmt.Errorf("you can't create more than %d instances", GlobalInstanceLimit))
 		}
 
-		instance, err := session.NewInstance(session.InstanceOptions{
+		instance := session.NewInstance(session.InstanceOptions{
 			Title:   fmt.Sprintf("instance-%d", m.list.NumInstances()+1),
 			Path:    ".",
 			Program: m.program,
 		})
-		if err != nil {
+		if err := instance.Start(); err != nil {
 			return m.showErrorMessageForShortTime(err)
 		}
 		m.list.AddInstance(instance)

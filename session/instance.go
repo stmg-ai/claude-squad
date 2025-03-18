@@ -27,6 +27,8 @@ type Instance struct {
 	Path string
 	// Status is the status of the instance.
 	Status Status
+	// Program is the program to run in the instance.
+	Program string
 	// Height is the height of the instance.
 	Height int
 	// Width is the width of the instance.
@@ -35,8 +37,9 @@ type Instance struct {
 	CreatedAt time.Time
 	// UpdatedAt is the time the instance was last updated.
 	UpdatedAt time.Time
-	// Program is the program to run in the instance.
-	Program string
+
+	// The below fields are initialized upon calling Start().
+
 	// tmuxSession is the tmux session for the instance.
 	tmuxSession *tmux.TmuxSession
 	// gitWorktree is the git worktree for the instance.
@@ -59,20 +62,18 @@ func (i *Instance) ToInstanceData() InstanceData {
 
 // FromInstanceData creates a new Instance from serialized data
 func FromInstanceData(data InstanceData) (*Instance, error) {
-	instance, err := NewInstance(InstanceOptions{
-		Title:   data.Title,
-		Path:    data.Path,
-		Program: data.Program,
-	})
-	if err != nil {
-		return nil, err
+	instance := &Instance{
+		Title:     data.Title,
+		Path:      data.Path,
+		Status:    data.Status,
+		Height:    data.Height,
+		Width:     data.Width,
+		CreatedAt: data.CreatedAt,
+		UpdatedAt: data.UpdatedAt,
+		Program:   data.Program,
 	}
-	instance.Status = data.Status
-	instance.Height = data.Height
-	instance.Width = data.Width
-	instance.CreatedAt = data.CreatedAt
-	instance.UpdatedAt = data.UpdatedAt
-	return instance, nil
+
+	return instance, instance.Start()
 }
 
 // Options for creating a new instance
@@ -85,64 +86,67 @@ type InstanceOptions struct {
 	Program string
 }
 
-func NewInstance(opts InstanceOptions) (*Instance, error) {
-	if opts.Title == "" {
-		return nil, fmt.Errorf("instance title cannot be empty")
+func NewInstance(opts InstanceOptions) *Instance {
+	t := time.Now()
+	return &Instance{
+		Title:     opts.Title,
+		Path:      opts.Path,
+		Status:    Loading,
+		Program:   opts.Program,
+		Height:    0,
+		Width:     0,
+		CreatedAt: t,
+		UpdatedAt: t,
+	}
+}
+
+func (i *Instance) Start() error {
+	if i.Title == "" {
+		return fmt.Errorf("instance title cannot be empty")
 	}
 
-	tmuxSession := tmux.NewTmuxSession(opts.Title)
-	gitWorktree := git.NewGitWorktree(opts.Path, opts.Title)
-
-	// Create instance first so we can use its cleanup methods
-	now := time.Now()
-	instance := &Instance{
-		Title:       opts.Title,
-		Path:        opts.Path,
-		Status:      Loading,
-		tmuxSession: tmuxSession,
-		gitWorktree: gitWorktree,
-		CreatedAt:   now,
-		UpdatedAt:   now,
-		Program:     opts.Program,
-	}
+	tmuxSession := tmux.NewTmuxSession(i.Title)
+	gitWorktree := git.NewGitWorktree(i.Path, i.Title)
+	i.tmuxSession = tmuxSession
+	i.gitWorktree = gitWorktree
 
 	// Setup error handler to cleanup resources on any error
 	var setupErr error
 	defer func() {
 		if setupErr != nil {
-			if cleanupErr := instance.Kill(); cleanupErr != nil {
+			if cleanupErr := i.Kill(); cleanupErr != nil {
 				setupErr = fmt.Errorf("%v (cleanup error: %v)", setupErr, cleanupErr)
 			}
 		}
 	}()
 
-	sessionExists := tmux.DoesSessionExist(opts.Title)
+	sessionExists := tmux.DoesSessionExist(i.Title)
 
 	if sessionExists {
 		// Reuse existing session
 		if err := tmuxSession.Restore(); err != nil {
 			setupErr = fmt.Errorf("failed to restore existing session: %w", err)
-			return nil, setupErr
+			return setupErr
 		}
 	} else {
 		// Setup git worktree first
 		if err := gitWorktree.Setup(); err != nil {
 			setupErr = fmt.Errorf("failed to setup git worktree: %w", err)
-			return nil, setupErr
+			return setupErr
 		}
 
 		// Create new session
-		if err := tmuxSession.Start(opts.Program, gitWorktree.GetWorktreePath()); err != nil {
+		if err := tmuxSession.Start(i.Program, gitWorktree.GetWorktreePath()); err != nil {
 			// Cleanup git worktree if tmux session creation fails
 			if cleanupErr := gitWorktree.Cleanup(); cleanupErr != nil {
 				err = fmt.Errorf("%v (cleanup error: %v)", err, cleanupErr)
 			}
 			setupErr = fmt.Errorf("failed to start new session: %w", err)
-			return nil, setupErr
+			return setupErr
 		}
 	}
 
-	return instance, nil
+	return nil
 }
 
 // Kill terminates the instance and cleans up all resources
