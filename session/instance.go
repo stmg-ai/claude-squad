@@ -2,6 +2,7 @@ package session
 
 import (
 	"claude-squad/session/git"
+	"claude-squad/session/tmux"
 
 	"fmt"
 	"time"
@@ -37,7 +38,7 @@ type Instance struct {
 	// Program is the program to run in the instance.
 	Program string
 	// tmuxSession is the tmux session for the instance.
-	tmuxSession *TmuxSession
+	tmuxSession *tmux.TmuxSession
 	// gitWorktree is the git worktree for the instance.
 	gitWorktree *git.GitWorktree
 }
@@ -89,7 +90,7 @@ func NewInstance(opts InstanceOptions) (*Instance, error) {
 		return nil, fmt.Errorf("instance title cannot be empty")
 	}
 
-	tmuxSession := NewTmuxSession(opts.Title)
+	tmuxSession := tmux.NewTmuxSession(opts.Title)
 	gitWorktree := git.NewGitWorktree(opts.Path, opts.Title)
 
 	// Create instance first so we can use its cleanup methods
@@ -115,7 +116,7 @@ func NewInstance(opts InstanceOptions) (*Instance, error) {
 		}
 	}()
 
-	sessionExists := DoesSessionExist(opts.Title)
+	sessionExists := tmux.DoesSessionExist(opts.Title)
 
 	if sessionExists {
 		// Reuse existing session
