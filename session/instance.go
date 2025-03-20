@@ -40,6 +40,7 @@ type Instance struct {
 
 	// The below fields are initialized upon calling Start().
 
+	started bool
 	// tmuxSession is the tmux session for the instance.
 	tmuxSession *tmux.TmuxSession
 	// gitWorktree is the git worktree for the instance.
@@ -73,7 +74,7 @@ func FromInstanceData(data InstanceData) (*Instance, error) {
 		Program:   data.Program,
 	}
 
-	return instance, instance.Start()
+	return instance, instance.Start(true)
 }
 
 // Options for creating a new instance
@@ -100,7 +101,7 @@ func NewInstance(opts InstanceOptions) *Instance {
 	}
 }
 
-func (i *Instance) Start() error {
+func (i *Instance) Start(sessionExists bool) error {
 	if i.Title == "" {
 		return fmt.Errorf("instance title cannot be empty")
 	}
@@ -117,10 +118,10 @@ func (i *Instance) Start() error {
 			if cleanupErr := i.Kill(); cleanupErr != nil {
 				setupErr = fmt.Errorf("%v (cleanup error: %v)", setupErr, cleanupErr)
 			}
+		} else {
+			i.started = true
 		}
 	}()
-
-	sessionExists := tmux.DoesSessionExist(i.Title)
 
 	if sessionExists {
 		// Reuse existing session
@@ -151,6 +152,9 @@ func (i *Instance) Start() error {
 
 // Kill terminates the instance and cleans up all resources
 func (i *Instance) Kill() error {
+	if !i.started {
+		return fmt.Errorf("cannot kill instance that has not been started")
+	}
 	var errs []error
 
 	// Always try to cleanup both resources, even if one fails
@@ -185,22 +189,51 @@ func (i *Instance) combineErrors(errs []error) error {
 
 // Close is an alias for Kill to maintain backward compatibility
 func (i *Instance) Close() error {
+	if !i.started {
+		return fmt.Errorf("cannot close instance that has not been started")
+	}
 	return i.Kill()
 }
 
 func (i *Instance) Preview() (string, error) {
+	if !i.started {
+		return "", nil
+	}
 	return i.tmuxSession.CapturePaneContent()
 }
 
 func (i *Instance) Attach() (chan struct{}, error) {
+	if !i.started {
+		return nil, fmt.Errorf("cannot attach instance that has not been started")
+	}
 	return i.tmuxSession.Attach()
 }
 
 func (i *Instance) SetPreviewSize(width, height int) error {
+	if !i.started {
+		return fmt.Errorf("cannot set preview size for instance that has not been started")
+	}
 	return i.tmuxSession.SetDetachedSize(width, height)
 }
 
 // GetGitWorktree returns the git worktree for the instance
-func (i *Instance) GetGitWorktree() *git.GitWorktree {
-	return i.gitWorktree
+func (i *Instance) GetGitWorktree() (*git.GitWorktree, error) {
+	if !i.started {
+		return nil, fmt.Errorf("cannot set preview size for instance that has not been started")
+	}
+	return i.gitWorktree, nil
+}
+
+func (i *Instance) Started() bool {
+	return i.started
+}
+
+// SetTitle sets the title of the instance. Returns an error if the instance has started.
+// We cant change the title once it's been used for a tmux session etc.
+func (i *Instance) SetTitle(title string) error {
+	if i.started {
+		return fmt.Errorf("cannot change title of a started instance")
+	}
+	i.Title = title
+	return nil
 }
