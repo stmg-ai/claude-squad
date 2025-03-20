@@ -69,19 +69,20 @@ func (p *PreviewPane) String() string {
 	// Calculate available height accounting for border and margin
 	availableHeight := p.maxHeight - 3 - 4 // 2 for borders, 1 for margin, 1 for ellipsis
 
-	// Split the raw text into lines first, preserving ANSI codes
 	lines := strings.Split(p.text, "\n")
-	if len(lines) > availableHeight && availableHeight > 0 {
-		lines = lines[:availableHeight]
-		lines = append(lines, "...")
-	}
-	if len(lines) < availableHeight && availableHeight > 0 {
-		for len(lines) < availableHeight {
-			lines = append(lines, "\n")
+	
+	// Truncate if we have more lines than available height
+	if availableHeight > 0 {
+		if len(lines) > availableHeight {
+			lines = lines[:availableHeight]
+			lines = append(lines, "...")
+		} else {
+			// Pad with empty lines to fill available height
+			padding := availableHeight - len(lines)
+			lines = append(lines, make([]string, padding)...)
 		}
 	}
 
-	// Join lines and wrap in preview pane style while preserving ANSI codes
 	content := strings.Join(lines, "\n")
 	return previewPaneStyle.Width(p.width).Render(content)
 }
