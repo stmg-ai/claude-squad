@@ -7,6 +7,17 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+const fallBackText = `
+░█████╗░██╗░░░░░░█████╗░██╗░░░██╗██████╗░███████╗  ░██████╗░██████╗░██╗░░░██╗░█████╗░██████╗░
+██╔══██╗██║░░░░░██╔══██╗██║░░░██║██╔══██╗██╔════╝  ██╔════╝██╔═══██╗██║░░░██║██╔══██╗██╔══██╗
+██║░░╚═╝██║░░░░░███████║██║░░░██║██║░░██║█████╗░░  ╚█████╗░██║██╗██║██║░░░██║███████║██║░░██║
+██║░░██╗██║░░░░░██╔══██║██║░░░██║██║░░██║██╔══╝░░  ░╚═══██╗╚██████╔╝██║░░░██║██╔══██║██║░░██║
+╚█████╔╝███████╗██║░░██║╚██████╔╝██████╔╝███████╗  ██████╔╝░╚═██╔═╝░╚██████╔╝██║░░██║██████╔╝
+░╚════╝░╚══════╝╚═╝░░╚═╝░╚═════╝░╚═════╝░╚══════╝  ╚═════╝░░░░╚═╝░░░░╚═════╝░╚═╝░░╚═╝╚═════╝░
+
+No agents running yet. Spin up a new instance with 'n' to get started!
+`
+
 var previewPaneStyle = lipgloss.NewStyle().
 	Border(lipgloss.NormalBorder(), true, true, true, true).
 	Foreground(lipgloss.AdaptiveColor{Light: "#1a1a1a", Dark: "#dddddd"}).
@@ -63,7 +74,30 @@ func (p *PreviewPane) String() string {
 		return strings.Repeat("\n", p.maxHeight)
 	}
 	if len(p.text) == 0 {
-		return previewPaneStyle.Width(p.width).Render("No content to display")
+		// Calculate available height for fallback text
+		availableHeight := p.maxHeight - 3 - 4 // 2 for borders, 1 for margin, 1 for padding
+		
+		// Count the number of lines in the fallback text
+		fallbackLines := len(strings.Split(fallBackText, "\n"))
+		
+		// Calculate padding needed above and below to center the content
+		totalPadding := availableHeight - fallbackLines
+		topPadding := totalPadding / 2
+		bottomPadding := totalPadding - topPadding // accounts for odd numbers
+		
+		// Build the centered content
+		var lines []string
+		lines = append(lines, strings.Repeat("\n", topPadding))
+		lines = append(lines, fallBackText)
+		if bottomPadding > 0 {
+			lines = append(lines, strings.Repeat("\n", bottomPadding))
+		}
+		
+		// Center both vertically and horizontally
+		return previewPaneStyle.
+			Width(p.width).
+			Align(lipgloss.Center).
+			Render(strings.Join(lines, ""))
 	}
 
 	// Calculate available height accounting for border and margin

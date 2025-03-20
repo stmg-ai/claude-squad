@@ -120,7 +120,7 @@ func (l *List) String() string {
 	var b strings.Builder
 	b.WriteString("\n")
 	b.WriteString(lipgloss.Place(
-		l.width, 1, lipgloss.Center, lipgloss.Top, mainTitle.Render("  claude squad beta  ")))
+		l.width, 1, lipgloss.Left, lipgloss.Top, mainTitle.Render("  Instances  ")))
 	b.WriteString("\n")
 	b.WriteString("\n")
 

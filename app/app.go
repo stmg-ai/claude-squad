@@ -323,7 +323,8 @@ func (m *home) showErrorMessageForShortTime(err error) (tea.Model, tea.Cmd) {
 }
 
 func (m *home) View() string {
-	listAndPreview := lipgloss.JoinHorizontal(lipgloss.Top, m.list.String(), m.preview.String())
+	previewWithPadding := lipgloss.NewStyle().PaddingTop(1).Render(m.preview.String())
+	listAndPreview := lipgloss.JoinHorizontal(lipgloss.Top, m.list.String(), previewWithPadding)
 
 	return lipgloss.JoinVertical(
 		lipgloss.Center,
