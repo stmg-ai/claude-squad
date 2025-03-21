@@ -22,7 +22,7 @@ var sepStyle = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{
 	Dark:  "#3C3C3C",
 })
 
-var separator = " • "
+var separator = "  •  "
 
 var menuStyle = lipgloss.NewStyle().
 	Foreground(lipgloss.Color("205"))
@@ -32,7 +32,7 @@ type Menu struct {
 	height, width int
 }
 
-var StartMenuOptions = []keys.KeyName{keys.KeyNew, keys.KeyKill, keys.KeyEnter, keys.KeyPush, keys.KeyQuit}
+var StartMenuOptions = []keys.KeyName{keys.KeyNew, keys.KeyKill, keys.KeyEnter, keys.KeyTab, keys.KeyPush, keys.KeyQuit}
 
 func NewMenu() *Menu {
 	return &Menu{

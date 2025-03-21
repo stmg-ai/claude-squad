@@ -15,6 +15,7 @@ const (
 	KeyQuit
 	KeyReview
 	KeyPush
+	KeyTab // Tab is a special keybinding for switching between panes.
 
 	// SubmitName is a special keybinding for submitting the name of a new instance.
 	KeySubmitName
@@ -33,6 +34,7 @@ var GlobalKeyStringsMap = map[string]KeyName{
 	"q":     KeyQuit,
 	"r":     KeyReview,
 	"p":     KeyPush,
+	"tab":   KeyTab,
 }
 
 // GlobalkeyBindings is a global, immutable map of KeyName tot keybinding.
@@ -68,6 +70,10 @@ var GlobalkeyBindings = map[KeyName]key.Binding{
 	KeyPush: key.NewBinding(
 		key.WithKeys("p"),
 		key.WithHelp("p", "push branch"),
+	),
+	KeyTab: key.NewBinding(
+		key.WithKeys("tab"),
+		key.WithHelp("tab", "switch tab"),
 	),
 	KeySubmitName: key.NewBinding(
 		key.WithKeys("enter"),

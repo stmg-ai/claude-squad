@@ -231,6 +231,9 @@ func (m *home) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case keys.KeyDown:
 		m.list.Down()
 		return m.updatePreview()
+	case keys.KeyTab:
+		m.tabbedWindow.Toggle()
+		return m.updatePreview()
 	case keys.KeyKill:
 		selected := m.list.GetSelectedInstance()
 		if selected == nil {

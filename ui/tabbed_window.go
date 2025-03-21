@@ -18,15 +18,15 @@ var (
 	activeTabBorder   = tabBorderWithBottom("┘", " ", "└")
 	highlightColor    = lipgloss.AdaptiveColor{Light: "#874BFD", Dark: "#7D56F4"}
 	inactiveTabStyle  = lipgloss.NewStyle().
-		Border(inactiveTabBorder, true).
-		BorderForeground(highlightColor).
-		AlignHorizontal(lipgloss.Center)
+				Border(inactiveTabBorder, true).
+				BorderForeground(highlightColor).
+				AlignHorizontal(lipgloss.Center)
 	activeTabStyle = inactiveTabStyle.
-		Border(activeTabBorder, true).
-		AlignHorizontal(lipgloss.Center)
+			Border(activeTabBorder, true).
+			AlignHorizontal(lipgloss.Center)
 	windowStyle = lipgloss.NewStyle().
-		BorderForeground(highlightColor).
-		Border(lipgloss.NormalBorder(), false, true, true, true)
+			BorderForeground(highlightColor).
+			Border(lipgloss.NormalBorder(), false, true, true, true)
 )
 
 type Tab struct {
@@ -73,6 +73,10 @@ func (w *TabbedWindow) SetSize(width, height int) {
 
 func (w *TabbedWindow) GetPreviewSize() (width, height int) {
 	return w.preview.width, w.preview.height
+}
+
+func (w *TabbedWindow) Toggle() {
+	w.activeTab = (w.activeTab + 1) % len(w.tabs)
 }
 
 func (w *TabbedWindow) UpdatePreview(instance *session.Instance) error {
@@ -122,10 +126,16 @@ func (w *TabbedWindow) String() string {
 	}
 
 	row := lipgloss.JoinHorizontal(lipgloss.Top, renderedTabs...)
+	var content string
+	if w.activeTab == 0 {
+		content = w.preview.String()
+	} else {
+		content = "No content"
+	}
 	window := windowStyle.Render(
 		lipgloss.Place(
 			w.width, w.height-2-windowStyle.GetVerticalFrameSize()-tabHeight,
-			lipgloss.Left, lipgloss.Top, w.preview.String()))
+			lipgloss.Left, lipgloss.Top, content))
 
 	return lipgloss.JoinVertical(lipgloss.Left, "\n", row, window)
 }
