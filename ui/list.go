@@ -11,10 +11,13 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-const readyIcon = "●"
+const readyIcon = "● "
 
 var readyStyle = lipgloss.NewStyle().
 	Foreground(lipgloss.AdaptiveColor{Light: "#51bd73", Dark: "#51bd73"})
+
+var spinnerStyle = lipgloss.NewStyle().
+	Foreground(lipgloss.AdaptiveColor{Light: "#1a1a1a", Dark: "#dddddd"})
 
 var titleStyle = lipgloss.NewStyle().
 	Foreground(lipgloss.AdaptiveColor{Light: "#1a1a1a", Dark: "#dddddd"})
@@ -22,11 +25,18 @@ var titleStyle = lipgloss.NewStyle().
 var listDescStyle = titleStyle.Foreground(lipgloss.AdaptiveColor{Light: "#A49FA5", Dark: "#777777"})
 
 var selectedTitleStyle = lipgloss.NewStyle().
-	Border(lipgloss.NormalBorder(), false, false, false, true).
-	BorderForeground(lipgloss.AdaptiveColor{Light: "#F793FF", Dark: "#AD58B4"}).
-	Foreground(lipgloss.AdaptiveColor{Light: "#EE6FF8", Dark: "#EE6FF8"})
+	Border(lipgloss.NormalBorder(), true, true, false, true).
+	Background(lipgloss.Color("#dde4f0")).
+	BorderBackground(lipgloss.Color("#dde4f0")).
+	BorderForeground(lipgloss.Color("#dde4f0")).
+	Foreground(lipgloss.AdaptiveColor{Light: "#1a1a1a", Dark: "#1a1a1a"})
 
-var selectedDescStyle = selectedTitleStyle.Foreground(lipgloss.AdaptiveColor{Light: "#F793FF", Dark: "#AD58B4"})
+var selectedDescStyle = lipgloss.NewStyle().
+	Border(lipgloss.NormalBorder(), false, true, true, true).
+	Background(lipgloss.Color("#dde4f0")).
+	BorderBackground(lipgloss.Color("#dde4f0")).
+	BorderForeground(lipgloss.Color("#dde4f0")).
+	Foreground(lipgloss.AdaptiveColor{Light: "#1a1a1a", Dark: "#1a1a1a"})
 
 var mainTitle = lipgloss.NewStyle().
 	Background(lipgloss.Color("62")).
@@ -51,6 +61,7 @@ func NewList(spinner *spinner.Model) *List {
 func (l *List) SetSize(width, height int) {
 	l.width = width
 	l.height = height
+	l.renderer.setWidth(width)
 }
 
 // SetSessionPreviewSize sets the height and width for the tmux sessions. This makes the stdout line have the correct
@@ -76,6 +87,11 @@ func (l *List) NumInstances() int {
 // InstanceRenderer handles rendering of session.Instance objects
 type InstanceRenderer struct {
 	spinner *spinner.Model
+	width   int
+}
+
+func (r *InstanceRenderer) setWidth(width int) {
+	r.width = AdjustPreviewWidth(width)
 }
 
 func (r *InstanceRenderer) Render(i *session.Instance, idx int, selected bool) string {
@@ -87,30 +103,32 @@ func (r *InstanceRenderer) Render(i *session.Instance, idx int, selected bool) s
 		descS = listDescStyle
 	}
 
-	title := titleS.Render(fmt.Sprintf("%s %s", prefix, i.Title))
-
 	// add spinner next to title if it's running
 	var join string
 	switch i.Status {
 	case session.Running:
-		join = r.spinner.View()
+		join = fmt.Sprintf("%s ", r.spinner.View())
 	case session.Ready:
 		join = readyStyle.Render(readyIcon)
 	default:
-
 	}
-	title = lipgloss.JoinHorizontal(
-		lipgloss.Left,
-		title,
-		" ",
-		join,
+
+	title := titleS.Render(
+		lipgloss.JoinHorizontal(
+			lipgloss.Left,
+			lipgloss.Place(r.width-3, 1, lipgloss.Left, lipgloss.Center, fmt.Sprintf("%s %s", prefix, i.Title)),
+			" ",
+			join,
+		),
 	)
 
 	// join title and subtitle
 	text := lipgloss.JoinVertical(
 		lipgloss.Left,
 		title,
-		descS.Render(fmt.Sprintf("%s %s", strings.Repeat(" ", len(prefix)), i.Path)),
+		descS.Render(
+			lipgloss.Place(r.width, 1, lipgloss.Left, lipgloss.Center, fmt.Sprintf("%s %s", strings.Repeat(" ", len(prefix)), i.Path)),
+		),
 	)
 
 	return text
