@@ -42,10 +42,10 @@ type home struct {
 	program string
 
 	// ui components
-	list    *ui.List
-	preview *ui.PreviewPane
-	menu    *ui.Menu
-	errBox  *ui.ErrBox
+	list         *ui.List
+	menu         *ui.Menu
+	tabbedWindow *ui.TabbedWindow
+	errBox       *ui.ErrBox
 	// global spinner instance. we plumb this down to where it's needed
 	spinner spinner.Model
 
@@ -69,14 +69,14 @@ func newHome(ctx context.Context, program string) *home {
 	}
 
 	h := &home{
-		ctx:     ctx,
-		spinner: spinner.New(spinner.WithSpinner(spinner.MiniDot)),
-		menu:    ui.NewMenu(),
-		errBox:  ui.NewErrBox(),
-		preview: ui.NewPreviewPane(0, 0),
-		storage: storage,
-		program: program,
-		state:   stateDefault,
+		ctx:          ctx,
+		spinner:      spinner.New(spinner.WithSpinner(spinner.MiniDot)),
+		menu:         ui.NewMenu(),
+		tabbedWindow: ui.NewTabbedWindow(ui.NewPreviewPane()),
+		errBox:       ui.NewErrBox(),
+		storage:      storage,
+		program:      program,
+		state:        stateDefault,
 	}
 	h.list = ui.NewList(&h.spinner)
 
@@ -100,15 +100,17 @@ func newHome(ctx context.Context, program string) *home {
 func (m *home) updateHandleWindowSizeEvent(msg tea.WindowSizeMsg) {
 	// List takes 30% of width, preview takes 70%
 	listWidth := int(float32(msg.Width) * 0.3)
-	previewWidth := msg.Width - listWidth
+	tabsWidth := msg.Width - listWidth
 
-	// Menu takes 10% of height, list and preview take 90%
+	// Menu takes 10% of height, list and window take 90%
 	contentHeight := int(float32(msg.Height) * 0.9)
 	menuHeight := msg.Height - contentHeight
 
-	m.preview.SetSize(previewWidth, contentHeight)
+	m.tabbedWindow.SetSize(tabsWidth, contentHeight)
 	m.list.SetSize(listWidth, contentHeight)
-	if err := m.list.SetSessionPreviewSize(ui.AdjustPreviewWidth(previewWidth), 40); err != nil {
+
+	previewWidth, previewHeight := m.tabbedWindow.GetPreviewSize()
+	if err := m.list.SetSessionPreviewSize(previewWidth, previewHeight); err != nil {
 		log.Println(err)
 	}
 	m.menu.SetSize(msg.Width, menuHeight)
@@ -162,13 +164,12 @@ func (m *home) handleQuit() (tea.Model, tea.Cmd) {
 }
 
 func (m *home) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// Handle quit commands first
-	if msg.String() == "ctrl+c" || msg.String() == "q" {
-		return m.handleQuit()
-	}
+	if m.state == stateNew {
+		// Handle quit commands first. Don't handle q because the user might want to type that.
+		if msg.String() == "ctrl+c" {
+			return m.handleQuit()
+		}
 
-	switch m.state {
-	case stateNew:
 		instance := m.list.GetInstances()[m.list.NumInstances()-1]
 		switch msg.Type {
 		// Start the instance (enable previews etc) and go back to the main menu state.
@@ -211,7 +212,11 @@ func (m *home) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		default:
 		}
 		return m, nil
-	default:
+	}
+
+	// Handle quit commands first
+	if msg.String() == "ctrl+c" || msg.String() == "q" {
+		return m.handleQuit()
 	}
 
 	name, ok := keys.GlobalKeyStringsMap[msg.String()]
@@ -294,7 +299,7 @@ func (m *home) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // updatePreview updates the preview pane with the currently selected instance
 func (m *home) updatePreview() (tea.Model, tea.Cmd) {
-	if err := m.preview.UpdateContent(m.list.GetSelectedInstance()); err != nil {
+	if err := m.tabbedWindow.UpdatePreview(m.list.GetSelectedInstance()); err != nil {
 		return m.showErrorMessageForShortTime(err)
 	}
 	return m, nil
@@ -323,7 +328,7 @@ func (m *home) showErrorMessageForShortTime(err error) (tea.Model, tea.Cmd) {
 }
 
 func (m *home) View() string {
-	previewWithPadding := lipgloss.NewStyle().PaddingTop(1).Render(m.preview.String())
+	previewWithPadding := lipgloss.NewStyle().PaddingTop(1).Render(m.tabbedWindow.String())
 	listAndPreview := lipgloss.JoinHorizontal(lipgloss.Top, m.list.String(), previewWithPadding)
 
 	return lipgloss.JoinVertical(

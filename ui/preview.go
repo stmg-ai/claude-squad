@@ -19,37 +19,23 @@ No agents running yet. Spin up a new instance with 'n' to get started!
 `
 
 var previewPaneStyle = lipgloss.NewStyle().
-	Border(lipgloss.NormalBorder(), true, true, true, true).
-	Foreground(lipgloss.AdaptiveColor{Light: "#1a1a1a", Dark: "#dddddd"}).
-	MarginTop(1)
+	Foreground(lipgloss.AdaptiveColor{Light: "#1a1a1a", Dark: "#dddddd"})
 
 type PreviewPane struct {
-	width     int
-	maxHeight int
+	width  int
+	height int
 
 	// text is the raw text being rendered, including ANSI color codes
 	text string
 }
 
-// AdjustPreviewWidth adjusts the width of the preview pane to be 90% of the provided width.
-func AdjustPreviewWidth(width int) int {
-	return int(float64(width) * 0.9)
-}
-
-func NewPreviewPane(width, maxHeight int) *PreviewPane {
-	// Use 70% of the provided width
-	adjustedWidth := AdjustPreviewWidth(width)
-	return &PreviewPane{width: adjustedWidth, maxHeight: maxHeight}
+func NewPreviewPane() *PreviewPane {
+	return &PreviewPane{}
 }
 
 func (p *PreviewPane) SetSize(width, maxHeight int) {
-	p.width = AdjustPreviewWidth(width)
-	p.maxHeight = maxHeight
-}
-
-// TODO: should we put a limit here to limit the amount we buffer? Maybe 5k chars?
-func (p *PreviewPane) SetText(text string) {
-	p.text = text
+	p.width = width
+	p.height = maxHeight
 }
 
 // Updates the preview pane content with the tmux pane content
@@ -70,8 +56,8 @@ func (p *PreviewPane) UpdateContent(instance *session.Instance) error {
 
 // Returns the preview pane content as a string.
 func (p *PreviewPane) String() string {
-	if p.width == 0 || p.maxHeight == 0 {
-		return strings.Repeat("\n", p.maxHeight)
+	if p.width == 0 || p.height == 0 {
+		return strings.Repeat("\n", p.height)
 	}
 	if len(p.text) == 0 {
 		// Calculate available height for fallback text
@@ -101,10 +87,10 @@ func (p *PreviewPane) String() string {
 	}
 
 	// Calculate available height accounting for border and margin
-	availableHeight := p.maxHeight - 3 - 4 // 2 for borders, 1 for margin, 1 for ellipsis
+	availableHeight := p.height - 3 - 4 // 2 for borders, 1 for margin, 1 for ellipsis
 
 	lines := strings.Split(p.text, "\n")
-	
+
 	// Truncate if we have more lines than available height
 	if availableHeight > 0 {
 		if len(lines) > availableHeight {
