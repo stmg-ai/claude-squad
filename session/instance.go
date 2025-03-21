@@ -3,7 +3,6 @@ package session
 import (
 	"claude-squad/session/git"
 	"claude-squad/session/tmux"
-
 	"fmt"
 	"time"
 )
@@ -92,7 +91,7 @@ func NewInstance(opts InstanceOptions) *Instance {
 	return &Instance{
 		Title:     opts.Title,
 		Path:      opts.Path,
-		Status:    Loading,
+		Status:    Ready,
 		Program:   opts.Program,
 		Height:    0,
 		Width:     0,
