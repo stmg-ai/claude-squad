@@ -206,7 +206,7 @@ func (m *home) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m.showErrorMessageForShortTime(err)
 			}
 		case tea.KeySpace:
-			if err := instance.SetTitle(instance.Title + "-"); err != nil {
+			if err := instance.SetTitle(instance.Title + " "); err != nil {
 				return m.showErrorMessageForShortTime(err)
 			}
 		default:

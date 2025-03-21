@@ -2,8 +2,9 @@ package ui
 
 import (
 	"claude-squad/session"
-	"github.com/charmbracelet/lipgloss"
 	"strings"
+
+	"github.com/charmbracelet/lipgloss"
 )
 
 var fallBackText = lipgloss.JoinVertical(lipgloss.Center, `
@@ -67,7 +68,7 @@ func (p *PreviewPane) String() string {
 	}
 	if len(p.text) == 0 {
 		// Calculate available height for fallback text
-		availableHeight := p.maxHeight - 3 - 4 // 2 for borders, 1 for margin, 1 for padding
+		availableHeight := p.height - 3 - 4 // 2 for borders, 1 for margin, 1 for padding
 		
 		// Count the number of lines in the fallback text
 		fallbackLines := len(strings.Split(fallBackText, "\n"))
