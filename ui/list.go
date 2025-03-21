@@ -94,8 +94,14 @@ func (r *InstanceRenderer) setWidth(width int) {
 	r.width = AdjustPreviewWidth(width)
 }
 
+// ɹ and ɻ are other options.
+const branchIcon = "Ꮧ"
+
 func (r *InstanceRenderer) Render(i *session.Instance, idx int, selected bool) string {
 	prefix := fmt.Sprintf(" %d. ", idx)
+	if idx >= 10 {
+		prefix = prefix[:len(prefix)-1]
+	}
 	titleS := selectedTitleStyle
 	descS := selectedDescStyle
 	if !selected {
@@ -127,7 +133,10 @@ func (r *InstanceRenderer) Render(i *session.Instance, idx int, selected bool) s
 		lipgloss.Left,
 		title,
 		descS.Render(
-			lipgloss.Place(r.width, 1, lipgloss.Left, lipgloss.Center, fmt.Sprintf("%s %s", strings.Repeat(" ", len(prefix)), i.Path)),
+			lipgloss.Place(
+				r.width, 1,
+				lipgloss.Left, lipgloss.Center,
+				fmt.Sprintf("%s %s-%s", strings.Repeat(" ", len(prefix)), branchIcon, i.Branch)),
 		),
 	)
 

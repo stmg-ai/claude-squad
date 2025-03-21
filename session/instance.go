@@ -24,6 +24,8 @@ type Instance struct {
 	Title string
 	// Path is the path to the workspace.
 	Path string
+	// Branch is the branch of the instance.
+	Branch string
 	// Status is the status of the instance.
 	Status Status
 	// Program is the program to run in the instance.
@@ -51,6 +53,7 @@ func (i *Instance) ToInstanceData() InstanceData {
 	return InstanceData{
 		Title:     i.Title,
 		Path:      i.Path,
+		Branch:    i.Branch,
 		Status:    i.Status,
 		Height:    i.Height,
 		Width:     i.Width,
@@ -65,6 +68,7 @@ func FromInstanceData(data InstanceData) (*Instance, error) {
 	instance := &Instance{
 		Title:     data.Title,
 		Path:      data.Path,
+		Branch:    data.Branch,
 		Status:    data.Status,
 		Height:    data.Height,
 		Width:     data.Width,
@@ -106,7 +110,8 @@ func (i *Instance) Start(sessionExists bool) error {
 	}
 
 	tmuxSession := tmux.NewTmuxSession(i.Title)
-	gitWorktree := git.NewGitWorktree(i.Path, i.Title)
+	gitWorktree, branchName := git.NewGitWorktree(i.Path, i.Title)
+	i.Branch = branchName
 	i.tmuxSession = tmuxSession
 	i.gitWorktree = gitWorktree
 

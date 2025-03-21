@@ -24,14 +24,14 @@ type GitWorktree struct {
 }
 
 // NewGitWorktree creates a new GitWorktree instance
-func NewGitWorktree(repoPath string, sessionName string) *GitWorktree {
+func NewGitWorktree(repoPath string, sessionName string) (tree *GitWorktree, branchname string) {
 	branchName := fmt.Sprintf("session-%s", sessionName)
 	return &GitWorktree{
 		repoPath:     repoPath,
 		sessionName:  sessionName,
 		branchName:   branchName,
 		worktreePath: filepath.Join(filepath.Dir(repoPath), fmt.Sprintf("worktree-%s", sessionName)),
-	}
+	}, branchName
 }
 
 // runGitCommand executes a git command and returns any error

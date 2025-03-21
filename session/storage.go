@@ -13,6 +13,7 @@ import (
 type InstanceData struct {
 	Title     string
 	Path      string
+	Branch    string
 	Status    Status
 	Height    int
 	Width     int
