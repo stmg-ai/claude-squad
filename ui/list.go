@@ -20,22 +20,21 @@ var spinnerStyle = lipgloss.NewStyle().
 	Foreground(lipgloss.AdaptiveColor{Light: "#1a1a1a", Dark: "#dddddd"})
 
 var titleStyle = lipgloss.NewStyle().
+	Padding(1, 1, 0, 1).
 	Foreground(lipgloss.AdaptiveColor{Light: "#1a1a1a", Dark: "#dddddd"})
 
-var listDescStyle = titleStyle.Foreground(lipgloss.AdaptiveColor{Light: "#A49FA5", Dark: "#777777"})
+var listDescStyle = lipgloss.NewStyle().
+	Padding(0, 1, 1, 1).
+	Foreground(lipgloss.AdaptiveColor{Light: "#A49FA5", Dark: "#777777"})
 
 var selectedTitleStyle = lipgloss.NewStyle().
-	Border(lipgloss.NormalBorder(), true, true, false, true).
+	Padding(1, 1, 0, 1).
 	Background(lipgloss.Color("#dde4f0")).
-	BorderBackground(lipgloss.Color("#dde4f0")).
-	BorderForeground(lipgloss.Color("#dde4f0")).
 	Foreground(lipgloss.AdaptiveColor{Light: "#1a1a1a", Dark: "#1a1a1a"})
 
 var selectedDescStyle = lipgloss.NewStyle().
-	Border(lipgloss.NormalBorder(), false, true, true, true).
+	Padding(0, 1, 1, 1).
 	Background(lipgloss.Color("#dde4f0")).
-	BorderBackground(lipgloss.Color("#dde4f0")).
-	BorderForeground(lipgloss.Color("#dde4f0")).
 	Foreground(lipgloss.AdaptiveColor{Light: "#1a1a1a", Dark: "#1a1a1a"})
 
 var mainTitle = lipgloss.NewStyle().
