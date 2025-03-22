@@ -23,7 +23,7 @@ func (t *TmuxSession) monitorWindowSize() {
 			}
 		}
 	}
-	
+
 	// Do one at the start to set the initial size
 	doUpdate()
 
@@ -54,4 +54,4 @@ func (t *TmuxSession) monitorWindowSize() {
 			}
 		}
 	}()
-} 
+}

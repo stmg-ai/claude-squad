@@ -25,7 +25,6 @@ func Initialize() {
 
 	globalLogFile = f
 	log.SetOutput(f)
-	return
 }
 
 func Close() {

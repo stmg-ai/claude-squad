@@ -32,8 +32,6 @@ const (
 	stateDefault state = iota
 	// stateNew is the state when the user is creating a new instance.
 	stateNew
-	// statePush is the state when the user is pushing changes
-	statePush
 )
 
 type home struct {

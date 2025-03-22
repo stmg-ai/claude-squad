@@ -20,9 +20,6 @@ var readyStyle = lipgloss.NewStyle().
 var pausedStyle = lipgloss.NewStyle().
 	Foreground(lipgloss.AdaptiveColor{Light: "#888888", Dark: "#888888"})
 
-var spinnerStyle = lipgloss.NewStyle().
-	Foreground(lipgloss.AdaptiveColor{Light: "#1a1a1a", Dark: "#dddddd"})
-
 var titleStyle = lipgloss.NewStyle().
 	Padding(1, 1, 0, 1).
 	Foreground(lipgloss.AdaptiveColor{Light: "#1a1a1a", Dark: "#dddddd"})
@@ -114,7 +111,6 @@ func (r *InstanceRenderer) Render(i *session.Instance, idx int, selected bool) s
 
 	// add spinner next to title if it's running
 	var join string
-	var title = fmt.Sprintf("%s %s", prefix, i.Title)
 	switch i.Status {
 	case session.Running:
 		join = fmt.Sprintf("%s ", r.spinner.View())
@@ -125,14 +121,12 @@ func (r *InstanceRenderer) Render(i *session.Instance, idx int, selected bool) s
 	default:
 	}
 
-	title = titleS.Render(
-		lipgloss.JoinHorizontal(
-			lipgloss.Left,
-			lipgloss.Place(r.width-3, 1, lipgloss.Left, lipgloss.Center, fmt.Sprintf("%s %s", prefix, i.Title)),
-			" ",
-			join,
-		),
-	)
+	title := titleS.Render(lipgloss.JoinHorizontal(
+		lipgloss.Left,
+		lipgloss.Place(r.width-3, 1, lipgloss.Left, lipgloss.Center, fmt.Sprintf("%s %s", prefix, i.Title)),
+		" ",
+		join,
+	))
 
 	// join title and subtitle
 	text := lipgloss.JoinVertical(

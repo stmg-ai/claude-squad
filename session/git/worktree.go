@@ -49,7 +49,7 @@ func NewGitWorktree(repoPath string, sessionName string) (tree *GitWorktree, bra
 
 	worktreePath := filepath.Join(worktreeDir, sanitizedName)
 	worktreePath = worktreePath + "_" + fmt.Sprintf("%x", time.Now().UnixNano())
-	
+
 	return &GitWorktree{
 		repoPath:     absPath,
 		sessionName:  sessionName,

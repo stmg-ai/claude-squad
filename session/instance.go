@@ -10,6 +10,8 @@ import (
 	"os"
 	"time"
 
+	"errors"
+
 	"github.com/atotto/clipboard"
 )
 
@@ -221,7 +223,7 @@ func (i *Instance) combineErrors(errs []error) error {
 	for _, err := range errs {
 		errMsg += "\n  - " + err.Error()
 	}
-	return fmt.Errorf(errMsg)
+	return errors.New(errMsg)
 }
 
 // Close is an alias for Kill to maintain backward compatibility
@@ -332,7 +334,7 @@ func (i *Instance) Pause() error {
 	}
 
 	i.Status = Paused
-	clipboard.WriteAll(i.gitWorktree.GetBranchName())
+	_ = clipboard.WriteAll(i.gitWorktree.GetBranchName())
 	return nil
 }
 

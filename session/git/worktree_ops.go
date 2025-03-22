@@ -39,9 +39,7 @@ func (g *GitWorktree) SetupFromExistingBranch() error {
 	}
 
 	// Clean up any existing worktree first
-	if _, err := g.runGitCommand(g.repoPath, "worktree", "remove", "-f", g.worktreePath); err != nil {
-		// Ignore errors here as the worktree might not exist
-	}
+	_, _ = g.runGitCommand(g.repoPath, "worktree", "remove", "-f", g.worktreePath) // Ignore error if worktree doesn't exist
 
 	// Create a new worktree from the existing branch
 	if _, err := g.runGitCommand(g.repoPath, "worktree", "add", g.worktreePath, g.branchName); err != nil {
@@ -61,9 +59,7 @@ func (g *GitWorktree) SetupNewWorktree() error {
 	}
 
 	// Clean up any existing worktree first
-	if _, err := g.runGitCommand(g.repoPath, "worktree", "remove", "-f", g.worktreePath); err != nil {
-		// Ignore errors here as the worktree might not exist
-	}
+	_, _ = g.runGitCommand(g.repoPath, "worktree", "remove", "-f", g.worktreePath) // Ignore error if worktree doesn't exist
 
 	// Open the repository
 	repo, err := git.PlainOpen(g.repoPath)
@@ -199,7 +195,7 @@ func CleanupWorktrees() error {
 	for _, entry := range entries {
 		if entry.IsDir() {
 			worktreePath := filepath.Join(worktreesDir, entry.Name())
-			
+
 			// Delete the branch associated with this worktree if found
 			for path, branch := range worktreeBranches {
 				if strings.Contains(path, entry.Name()) {
@@ -212,11 +208,11 @@ func CleanupWorktrees() error {
 					break
 				}
 			}
-			
+
 			// Remove the worktree directory
 			os.RemoveAll(worktreePath)
 		}
 	}
-	
+
 	return nil
-} 
+}

@@ -70,4 +70,4 @@ func TestSanitizeBranchName(t *testing.T) {
 			}
 		})
 	}
-} 
+}

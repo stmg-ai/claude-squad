@@ -43,8 +43,8 @@ const (
 type Menu struct {
 	options       []keys.KeyName
 	height, width int
-	state        MenuState
-	instance     *session.Instance
+	state         MenuState
+	instance      *session.Instance
 }
 
 var defaultMenuOptions = []keys.KeyName{keys.KeyNew, keys.KeyQuit}
@@ -84,7 +84,7 @@ func (m *Menu) updateOptions() {
 
 		// Instance management group
 		options := []keys.KeyName{keys.KeyNew, keys.KeyKill}
-		
+
 		// Action group
 		actionGroup := []keys.KeyName{keys.KeyEnter, keys.KeySubmit}
 		if m.instance.Status == session.Paused {
@@ -92,14 +92,14 @@ func (m *Menu) updateOptions() {
 		} else {
 			actionGroup = append(actionGroup, keys.KeyPause)
 		}
-		
+
 		// System group
 		systemGroup := []keys.KeyName{keys.KeyTab, keys.KeyQuit}
 
 		// Combine all groups
 		options = append(options, actionGroup...)
 		options = append(options, systemGroup...)
-		
+
 		m.options = options
 	}
 }
@@ -112,23 +112,23 @@ func (m *Menu) SetSize(width, height int) {
 
 func (m *Menu) String() string {
 	var s strings.Builder
-	
+
 	// Define group boundaries
 	groups := []struct {
 		start int
 		end   int
 	}{
-		{0, 2},    // Instance management group (n, d)
-		{2, 5},    // Action group (enter, submit, pause/resume)
-		{5, 7},    // System group (tab, q)
+		{0, 2}, // Instance management group (n, d)
+		{2, 5}, // Action group (enter, submit, pause/resume)
+		{5, 7}, // System group (tab, q)
 	}
-	
+
 	for i, k := range m.options {
 		binding := keys.GlobalkeyBindings[k]
-		
+
 		// Check if we're in the action group (middle group)
 		inActionGroup := i >= groups[1].start && i < groups[1].end
-		
+
 		if inActionGroup {
 			s.WriteString(actionGroupStyle.Render(binding.Help().Key))
 			s.WriteString(" ")
@@ -138,7 +138,7 @@ func (m *Menu) String() string {
 			s.WriteString(" ")
 			s.WriteString(descStyle.Render(binding.Help().Desc))
 		}
-		
+
 		// Add appropriate separator
 		if i != len(m.options)-1 {
 			isGroupEnd := false

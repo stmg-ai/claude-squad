@@ -77,4 +77,4 @@ func SaveConfig(config *Config) error {
 	}
 
 	return os.WriteFile(configPath, data, 0644)
-} 
+}

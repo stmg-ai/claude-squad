@@ -66,7 +66,10 @@ func (s *Storage) SaveInstances(instances []*Instance) error {
 		timestamp := time.Now().Format("20060102_150405")
 		backupFile := filepath.Join(s.backupDir, fmt.Sprintf("instances_%s.json", timestamp))
 		if data, err := os.ReadFile(s.filePath); err == nil {
-			os.WriteFile(backupFile, data, 0644)
+			err = os.WriteFile(backupFile, data, 0644)
+			if err != nil {
+				return fmt.Errorf("failed to create backup: %w", err)
+			}
 		}
 	}
 

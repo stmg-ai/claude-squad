@@ -17,7 +17,7 @@ func (t *TmuxSession) monitorWindowSize() {
 	winchChan := make(chan os.Signal, 1)
 	signal.Notify(winchChan, syscall.SIGWINCH)
 	// Send initial SIGWINCH to trigger the first resize
-	syscall.Kill(syscall.Getpid(), syscall.SIGWINCH)
+	_ = syscall.Kill(syscall.Getpid(), syscall.SIGWINCH)
 
 	doUpdate := func() {
 		// Use the current terminal height and width.
@@ -69,4 +69,4 @@ func (t *TmuxSession) monitorWindowSize() {
 			}
 		}
 	}()
-} 
+}

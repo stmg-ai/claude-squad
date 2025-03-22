@@ -2,6 +2,7 @@ package tmux
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -243,7 +244,7 @@ func (t *TmuxSession) Close() error {
 	for _, err := range errs {
 		errMsg += "\n  - " + err.Error()
 	}
-	return fmt.Errorf(errMsg)
+	return errors.New(errMsg)
 }
 
 // SetDetachedSize set the width and height of the session while detached. This makes the
@@ -296,7 +297,7 @@ func CleanupSessions() error {
 	// First try to list sessions
 	cmd := exec.Command("tmux", "ls")
 	output, err := cmd.Output()
-	
+
 	// If there's an error and it's because no server is running, that's fine
 	// Exit code 1 typically means no sessions exist
 	if err != nil {

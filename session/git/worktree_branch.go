@@ -1,6 +1,7 @@
 package git
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/go-git/go-git/v5"
@@ -55,5 +56,5 @@ func (g *GitWorktree) combineErrors(errs []error) error {
 	for _, err := range errs {
 		errMsg += "\n  - " + err.Error()
 	}
-	return fmt.Errorf(errMsg)
-} 
+	return errors.New(errMsg)
+}

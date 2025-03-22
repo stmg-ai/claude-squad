@@ -90,4 +90,4 @@ func (g *GitWorktree) IsBranchCheckedOut() (bool, error) {
 		}
 		return strings.TrimSpace(string(output)) == g.branchName, nil
 	}
-} 
+}
