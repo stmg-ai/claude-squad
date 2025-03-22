@@ -20,9 +20,6 @@ var fallBackText = lipgloss.JoinVertical(lipgloss.Center, `
 ╚█████╗░██║██╗██║██║░░░██║███████║██║░░██║
 ░╚═══██╗╚██████╔╝██║░░░██║██╔══██║██║░░██║
 ██████╔╝░╚═██╔═╝░╚██████╔╝██║░░██║██████╔╝
-`,
-	`
-No agents running yet. Spin up a new instance with 'n' to get started!
 `)
 
 var previewPaneStyle = lipgloss.NewStyle().
@@ -32,7 +29,13 @@ type PreviewPane struct {
 	width  int
 	height int
 
-	// text is the raw text being rendered, including ANSI color codes
+	previewState previewState
+}
+
+type previewState struct {
+	// fallback is true if the preview pane is displaying fallback text
+	fallback bool
+	// text is the text displayed in the preview pane
 	text string
 }
 
@@ -45,10 +48,22 @@ func (p *PreviewPane) SetSize(width, maxHeight int) {
 	p.height = maxHeight
 }
 
+// setFallbackState sets the preview state with fallback text and a message
+func (p *PreviewPane) setFallbackState(message string) {
+	p.previewState = previewState{
+		fallback: true,
+		text:     lipgloss.JoinVertical(lipgloss.Center, fallBackText, "", message),
+	}
+}
+
 // Updates the preview pane content with the tmux pane content
 func (p *PreviewPane) UpdateContent(instance *session.Instance) error {
-	if instance == nil {
-		p.text = ""
+	switch {
+	case instance == nil:
+		p.setFallbackState("No agents running yet. Spin up a new instance with 'n' to get started!")
+		return nil
+	case instance.Status == session.Paused:
+		p.setFallbackState("Session is paused. Press 'p' to resume.")
 		return nil
 	}
 
@@ -57,7 +72,15 @@ func (p *PreviewPane) UpdateContent(instance *session.Instance) error {
 		return err
 	}
 
-	p.text = content
+	if len(content) == 0 {
+		p.setFallbackState("No agents running yet. Spin up a new instance with 'n' to get started!")
+		return nil
+	}
+
+	p.previewState = previewState{
+		fallback: false,
+		text:     content,
+	}
 	return nil
 }
 
@@ -66,12 +89,13 @@ func (p *PreviewPane) String() string {
 	if p.width == 0 || p.height == 0 {
 		return strings.Repeat("\n", p.height)
 	}
-	if len(p.text) == 0 {
+
+	if p.previewState.fallback {
 		// Calculate available height for fallback text
 		availableHeight := p.height - 3 - 4 // 2 for borders, 1 for margin, 1 for padding
 		
 		// Count the number of lines in the fallback text
-		fallbackLines := len(strings.Split(fallBackText, "\n"))
+		fallbackLines := len(strings.Split(p.previewState.text, "\n"))
 		
 		// Calculate padding needed above and below to center the content
 		totalPadding := availableHeight - fallbackLines
@@ -81,7 +105,7 @@ func (p *PreviewPane) String() string {
 		// Build the centered content
 		var lines []string
 		lines = append(lines, strings.Repeat("\n", topPadding))
-		lines = append(lines, fallBackText)
+		lines = append(lines, p.previewState.text)
 		if bottomPadding > 0 {
 			lines = append(lines, strings.Repeat("\n", bottomPadding))
 		}
@@ -96,7 +120,7 @@ func (p *PreviewPane) String() string {
 	// Calculate available height accounting for border and margin
 	availableHeight := p.height - 3 - 4 // 2 for borders, 1 for margin, 1 for ellipsis
 
-	lines := strings.Split(p.text, "\n")
+	lines := strings.Split(p.previewState.text, "\n")
 
 	// Truncate if we have more lines than available height
 	if availableHeight > 0 {
