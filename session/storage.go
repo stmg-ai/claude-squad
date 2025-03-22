@@ -9,6 +9,14 @@ import (
 	"time"
 )
 
+// GitWorktreeData represents the serializable data of a GitWorktree
+type GitWorktreeData struct {
+	RepoPath     string
+	WorktreePath string
+	SessionName  string
+	BranchName   string
+}
+
 // InstanceData represents the serializable data of an Instance
 type InstanceData struct {
 	Title     string
@@ -20,6 +28,7 @@ type InstanceData struct {
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	Program   string
+	Worktree  GitWorktreeData
 }
 
 // Storage handles saving and loading instances

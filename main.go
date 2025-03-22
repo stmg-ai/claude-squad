@@ -5,6 +5,8 @@ import (
 	"claude-squad/config"
 	"claude-squad/logger"
 	"claude-squad/session"
+	"claude-squad/session/git"
+	"claude-squad/session/tmux"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -39,6 +41,17 @@ var (
 					return fmt.Errorf("failed to reset storage: %w", err)
 				}
 				fmt.Println("Storage has been reset successfully")
+
+				if err := tmux.CleanupSessions(); err != nil {
+					return fmt.Errorf("failed to cleanup tmux sessions: %w", err)
+				}
+				fmt.Println("Tmux sessions have been cleaned up")
+
+				if err := git.CleanupWorktrees(); err != nil {
+					return fmt.Errorf("failed to cleanup worktrees: %w", err)
+				}
+				fmt.Println("Worktrees have been cleaned up")
+
 				return nil
 			}
 

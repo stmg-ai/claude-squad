@@ -1,6 +1,8 @@
 package git
 
 import (
+	"fmt"
+	"os/exec"
 	"regexp"
 	"strings"
 )
@@ -28,4 +30,20 @@ func sanitizeBranchName(s string) string {
 	s = strings.Trim(s, "-/")
 	
 	return s
+}
+
+// checkGHCLI checks if GitHub CLI is installed and configured
+func checkGHCLI() error {
+	// Check if gh is installed
+	if _, err := exec.LookPath("gh"); err != nil {
+		return fmt.Errorf("GitHub CLI (gh) is not installed. Please install it first")
+	}
+
+	// Check if gh is authenticated
+	cmd := exec.Command("gh", "auth", "status")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("GitHub CLI is not configured. Please run 'gh auth login' first")
+	}
+
+	return nil
 }

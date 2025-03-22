@@ -3,8 +3,14 @@ package session
 import (
 	"claude-squad/session/git"
 	"claude-squad/session/tmux"
+	"log"
+	"path/filepath"
+
 	"fmt"
+	"os"
 	"time"
+
+	"github.com/atotto/clipboard"
 )
 
 type Status int
@@ -16,6 +22,8 @@ const (
 	Ready
 	// Loading is if the instance is loading (if we are starting it up or something).
 	Loading
+	// Paused is if the instance is paused (worktree removed but branch preserved).
+	Paused
 )
 
 // Instance is a running instance of claude code.
@@ -60,6 +68,12 @@ func (i *Instance) ToInstanceData() InstanceData {
 		CreatedAt: i.CreatedAt,
 		UpdatedAt: time.Now(),
 		Program:   i.Program,
+		Worktree: GitWorktreeData{
+			RepoPath:     i.gitWorktree.GetRepoPath(),
+			WorktreePath: i.gitWorktree.GetWorktreePath(),
+			SessionName:  i.Title,
+			BranchName:   i.gitWorktree.GetBranchName(),
+		},
 	}
 }
 
@@ -90,18 +104,25 @@ type InstanceOptions struct {
 	Program string
 }
 
-func NewInstance(opts InstanceOptions) *Instance {
+func NewInstance(opts InstanceOptions) (*Instance, error) {
 	t := time.Now()
+
+	// Convert path to absolute
+	absPath, err := filepath.Abs(opts.Path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get absolute path: %w", err)
+	}
+
 	return &Instance{
 		Title:     opts.Title,
-		Path:      opts.Path,
 		Status:    Ready,
+		Path:      absPath,
 		Program:   opts.Program,
 		Height:    0,
 		Width:     0,
 		CreatedAt: t,
 		UpdatedAt: t,
-	}
+	}, nil
 }
 
 func (i *Instance) Start(sessionExists bool) error {
@@ -110,7 +131,11 @@ func (i *Instance) Start(sessionExists bool) error {
 	}
 
 	tmuxSession := tmux.NewTmuxSession(i.Title)
-	gitWorktree, branchName := git.NewGitWorktree(i.Path, i.Title)
+	gitWorktree, branchName, err := git.NewGitWorktree(i.Path, i.Title)
+	if err != nil {
+		return fmt.Errorf("failed to create git worktree: %w", err)
+	}
+
 	i.Branch = branchName
 	i.tmuxSession = tmuxSession
 	i.gitWorktree = gitWorktree
@@ -151,25 +176,33 @@ func (i *Instance) Start(sessionExists bool) error {
 		}
 	}
 
+	i.Status = Running
+
 	return nil
 }
 
 // Kill terminates the instance and cleans up all resources
 func (i *Instance) Kill() error {
 	if !i.started {
-		return fmt.Errorf("cannot kill instance that has not been started")
+		// If instance was never started, just return success
+		return nil
 	}
+
 	var errs []error
 
 	// Always try to cleanup both resources, even if one fails
 	// Clean up tmux session first since it's using the git worktree
-	if err := i.tmuxSession.Close(); err != nil {
-		errs = append(errs, fmt.Errorf("failed to close tmux session: %w", err))
+	if i.tmuxSession != nil {
+		if err := i.tmuxSession.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("failed to close tmux session: %w", err))
+		}
 	}
 
 	// Then clean up git worktree
-	if err := i.gitWorktree.Cleanup(); err != nil {
-		errs = append(errs, fmt.Errorf("failed to cleanup git worktree: %w", err))
+	if i.gitWorktree != nil {
+		if err := i.gitWorktree.Cleanup(); err != nil {
+			errs = append(errs, fmt.Errorf("failed to cleanup git worktree: %w", err))
+		}
 	}
 
 	return i.combineErrors(errs)
@@ -200,7 +233,7 @@ func (i *Instance) Close() error {
 }
 
 func (i *Instance) Preview() (string, error) {
-	if !i.started {
+	if !i.started || i.Status == Paused {
 		return "", nil
 	}
 	return i.tmuxSession.CapturePaneContent()
@@ -223,7 +256,7 @@ func (i *Instance) SetPreviewSize(width, height int) error {
 // GetGitWorktree returns the git worktree for the instance
 func (i *Instance) GetGitWorktree() (*git.GitWorktree, error) {
 	if !i.started {
-		return nil, fmt.Errorf("cannot set preview size for instance that has not been started")
+		return nil, fmt.Errorf("cannot get git worktree for instance that has not been started")
 	}
 	return i.gitWorktree, nil
 }
@@ -239,5 +272,104 @@ func (i *Instance) SetTitle(title string) error {
 		return fmt.Errorf("cannot change title of a started instance")
 	}
 	i.Title = title
+	return nil
+}
+
+// Pause stops the tmux session and removes the worktree, preserving the branch
+func (i *Instance) Pause() error {
+	if !i.started {
+		return fmt.Errorf("cannot pause instance that has not been started")
+	}
+	if i.Status == Paused {
+		return fmt.Errorf("instance is already paused")
+	}
+
+	var errs []error
+
+	// Check if there are any changes to commit
+	if dirty, err := i.gitWorktree.IsDirty(); err != nil {
+		errs = append(errs, fmt.Errorf("failed to check if worktree is dirty: %w", err))
+		log.Println(err)
+	} else if dirty {
+		// Commit changes with timestamp
+		commitMsg := fmt.Sprintf("Update from session %s at %s (paused)", i.Title, time.Now().Format(time.RFC3339))
+		if err := i.gitWorktree.PushChanges(commitMsg); err != nil {
+			errs = append(errs, fmt.Errorf("failed to commit changes: %w", err))
+			log.Println(err)
+			// Return early if we can't commit changes to avoid corrupted state
+			return i.combineErrors(errs)
+		}
+	}
+
+	// Close tmux session first since it's using the git worktree
+	if err := i.tmuxSession.Close(); err != nil {
+		errs = append(errs, fmt.Errorf("failed to close tmux session: %w", err))
+		log.Println(err)
+		// Return early if we can't close tmux to avoid corrupted state
+		return i.combineErrors(errs)
+	}
+
+	// Check if worktree exists before trying to remove it
+	if _, err := os.Stat(i.gitWorktree.GetWorktreePath()); err == nil {
+		// Remove worktree but keep branch
+		if err := i.gitWorktree.Remove(); err != nil {
+			errs = append(errs, fmt.Errorf("failed to remove git worktree: %w", err))
+			log.Println(err)
+			return i.combineErrors(errs)
+		}
+
+		// Only prune if remove was successful
+		if err := i.gitWorktree.Prune(); err != nil {
+			errs = append(errs, fmt.Errorf("failed to prune git worktrees: %w", err))
+			log.Println(err)
+			return i.combineErrors(errs)
+		}
+	}
+
+	if err := i.combineErrors(errs); err != nil {
+		log.Println(err)
+		return err
+	}
+
+	i.Status = Paused
+	clipboard.WriteAll(i.gitWorktree.GetBranchName())
+	return nil
+}
+
+// Resume recreates the worktree and restarts the tmux session
+func (i *Instance) Resume() error {
+	if !i.started {
+		return fmt.Errorf("cannot resume instance that has not been started")
+	}
+	if i.Status != Paused {
+		return fmt.Errorf("can only resume paused instances")
+	}
+
+	// Check if branch is checked out
+	if checked, err := i.gitWorktree.IsBranchCheckedOut(); err != nil {
+		log.Println(err)
+		return fmt.Errorf("failed to check if branch is checked out: %w", err)
+	} else if checked {
+		return fmt.Errorf("cannot resume: branch is checked out, please switch to a different branch")
+	}
+
+	// Setup git worktree
+	if err := i.gitWorktree.Setup(); err != nil {
+		log.Println(err)
+		return fmt.Errorf("failed to setup git worktree: %w", err)
+	}
+
+	// Create new tmux session
+	if err := i.tmuxSession.Start(i.Program, i.gitWorktree.GetWorktreePath()); err != nil {
+		log.Println(err)
+		// Cleanup git worktree if tmux session creation fails
+		if cleanupErr := i.gitWorktree.Cleanup(); cleanupErr != nil {
+			err = fmt.Errorf("%v (cleanup error: %v)", err, cleanupErr)
+			log.Println(err)
+		}
+		return fmt.Errorf("failed to start new session: %w", err)
+	}
+
+	i.Status = Running
 	return nil
 }

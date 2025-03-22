@@ -139,7 +139,7 @@ func (t *TmuxSession) Attach() (chan struct{}, error) {
 			close(timeoutCh)
 		}()
 
-		// Read input from stdin and check for escape key
+		// Read input from stdin and check for Ctrl+q
 		buf := make([]byte, 32)
 		for {
 			nr, err := os.Stdin.Read(buf)
@@ -164,8 +164,8 @@ func (t *TmuxSession) Attach() (chan struct{}, error) {
 				continue
 			}
 
-			// Check for escape key (ASCII 27)
-			if nr == 1 && buf[0] == 27 {
+			// Check for Ctrl+q (ASCII 17)
+			if nr == 1 && buf[0] == 17 {
 				// Detach from the session
 				if err := t.Detach(); err != nil {
 					log.Printf("Error detaching from tmux session: %v", err)
@@ -289,4 +289,31 @@ func (t *TmuxSession) CapturePaneContentWithOptions(start, end string) (string, 
 		return "", fmt.Errorf("failed to capture tmux pane content with options: %v", err)
 	}
 	return string(output), nil
+}
+
+// CleanupSessions kills all tmux sessions that start with "session-"
+func CleanupSessions() error {
+	// First try to list sessions
+	cmd := exec.Command("tmux", "ls")
+	output, err := cmd.Output()
+	
+	// If there's an error and it's because no server is running, that's fine
+	// Exit code 1 typically means no sessions exist
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
+			return nil // No sessions to clean up
+		}
+		return fmt.Errorf("failed to list tmux sessions: %v", err)
+	}
+
+	re := regexp.MustCompile(`^session-\d+`)
+	matches := re.FindAllString(string(output), -1)
+
+	for _, match := range matches {
+		cmd := exec.Command("tmux", "kill-session", "-t", match)
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("failed to kill tmux session %s: %v", match, err)
+		}
+	}
+	return nil
 }
