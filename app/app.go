@@ -123,6 +123,7 @@ func (m *home) Init() tea.Cmd {
 			time.Sleep(100 * time.Millisecond)
 			return previewTickMsg{}
 		},
+		tickStatusesCmd,
 	)
 }
 
@@ -141,6 +142,18 @@ func (m *home) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return previewTickMsg{}
 			},
 		)
+	case tickStatusesMessage:
+		for _, instance := range m.list.GetInstances() {
+			if !instance.Started() || instance.Paused() {
+				continue
+			}
+			if instance.HasUpdated() {
+				instance.SetStatus(session.Running)
+			} else {
+				instance.SetStatus(session.Ready)
+			}
+		}
+		return m, tickStatusesCmd
 	case tea.KeyMsg:
 		return m.handleKeyPress(msg)
 	case tea.WindowSizeMsg:
@@ -345,6 +358,15 @@ type hideErrMsg struct{}
 
 // previewTickMsg implements tea.Msg and triggers a preview update
 type previewTickMsg struct{}
+
+type tickStatusesMessage struct{}
+
+// tickStatusesCmd is the callback to update the statuses of the instances every 500ms. Note that we iterate
+// overall the instances and capture their output. It's a pretty expensive operation. Let's do it 2x a second only.
+var tickStatusesCmd = func() tea.Msg {
+	time.Sleep(500 * time.Millisecond)
+	return tickStatusesMessage{}
+}
 
 // showErrorMessageForShortTime sets the error message. We return a callback. I assume bubbletea calls the
 // callback in a goroutine because it says that tea.Msg / tea.Cmd should be used for IO operations. These
