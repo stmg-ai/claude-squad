@@ -132,6 +132,13 @@ func (t *TmuxSession) Attach() (chan struct{}, error) {
 	}()
 
 	go func() {
+		// Close the channel after 50ms
+		timeoutCh := make(chan struct{})
+		go func() {
+			time.Sleep(50 * time.Millisecond)
+			close(timeoutCh)
+		}()
+
 		// Read input from stdin and check for escape key
 		buf := make([]byte, 32)
 		for {
@@ -140,6 +147,20 @@ func (t *TmuxSession) Attach() (chan struct{}, error) {
 				if err == io.EOF {
 					break
 				}
+				continue
+			}
+
+			// Nuke the first bytes of stdin, up to 64, to prevent tmux from reading it.
+			// When we attach, there tends to be terminal control sequences like ?[?62c0;95;0c or
+			// ]10;rgb:f8f8f8. The control sequences depend on the terminal (warp vs iterm). We should use regex ideally
+			// but this works well for now. Log this for debugging.
+			//
+			// There seems to always be control characters, but I think it's possible for there not to be. The heuristic
+			// here can be: if there's characters within 50ms, then assume they are control characters and nuke them.
+			select {
+			case <-timeoutCh:
+			default:
+				log.Printf("nuked first stdin: %s", buf[:nr])
 				continue
 			}
 
