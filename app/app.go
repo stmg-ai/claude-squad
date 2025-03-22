@@ -209,6 +209,16 @@ func (m *home) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if err := instance.SetTitle(instance.Title + " "); err != nil {
 				return m.showErrorMessageForShortTime(err)
 			}
+		case tea.KeyEsc:
+			m.list.Kill()
+			m.state = stateDefault
+			return m, tea.Sequence(
+				tea.WindowSize(),
+				func() tea.Msg {
+					m.menu.SetState(ui.StateDefault)
+					return nil
+				},
+			)
 		default:
 		}
 		return m, nil
