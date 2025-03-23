@@ -68,7 +68,7 @@ func (l *List) SetSize(width, height int) {
 // width and height.
 func (l *List) SetSessionPreviewSize(width, height int) (err error) {
 	for i, item := range l.items {
-		if !item.Started() {
+		if !item.Started() || item.Paused() {
 			continue
 		}
 

@@ -180,7 +180,7 @@ func (m *home) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.state = stateDefault
 				m.menu.SetState(ui.StateDefault)
 			}()
-			if err := instance.Start(false); err != nil {
+			if err := instance.Start(true); err != nil {
 				m.list.Kill()
 				return m.showErrorMessageForShortTime(err)
 			}
@@ -310,7 +310,7 @@ func (m *home) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if err := selected.Resume(); err != nil {
 			return m.showErrorMessageForShortTime(err)
 		}
-		return m.updatePreview()
+		return m, tea.WindowSize()
 	case keys.KeyEnter:
 		if m.list.NumInstances() == 0 {
 			return m, nil

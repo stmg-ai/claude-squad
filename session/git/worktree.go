@@ -26,8 +26,15 @@ type GitWorktree struct {
 	sessionName string
 	// Branch name for the worktree
 	branchName string
-	// Whether the worktree is checked out
-	checkedOut bool
+}
+
+func NewGitWorktreeFromStorage(repoPath string, worktreePath string, sessionName string, branchName string) *GitWorktree {
+	return &GitWorktree{
+		repoPath:     repoPath,
+		worktreePath: worktreePath,
+		sessionName:  sessionName,
+		branchName:   branchName,
+	}
 }
 
 // NewGitWorktree creates a new GitWorktree instance
@@ -55,7 +62,6 @@ func NewGitWorktree(repoPath string, sessionName string) (tree *GitWorktree, bra
 		sessionName:  sessionName,
 		branchName:   branchName,
 		worktreePath: worktreePath,
-		checkedOut:   false,
 	}, branchName, nil
 }
 
