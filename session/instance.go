@@ -142,6 +142,10 @@ func NewInstance(opts InstanceOptions) (*Instance, error) {
 	}, nil
 }
 
+func (i *Instance) SetStatus(status Status) {
+	i.Status = status
+}
+
 // firstTimeSetup is true if this is a new instance. Otherwise, it's one loaded from storage.
 func (i *Instance) Start(firstTimeSetup bool) error {
 	if i.Title == "" {
@@ -196,7 +200,7 @@ func (i *Instance) Start(firstTimeSetup bool) error {
 		}
 	}
 
-	i.Status = Running
+	i.SetStatus(Running)
 
 	return nil
 }
@@ -257,6 +261,13 @@ func (i *Instance) Preview() (string, error) {
 		return "", nil
 	}
 	return i.tmuxSession.CapturePaneContent()
+}
+
+func (i *Instance) HasUpdated() bool {
+	if !i.started {
+		return false
+	}
+	return i.tmuxSession.HasUpdated()
 }
 
 func (i *Instance) Attach() (chan struct{}, error) {
@@ -356,7 +367,7 @@ func (i *Instance) Pause() error {
 		return err
 	}
 
-	i.Status = Paused
+	i.SetStatus(Paused)
 	_ = clipboard.WriteAll(i.gitWorktree.GetBranchName())
 	return nil
 }
@@ -395,6 +406,6 @@ func (i *Instance) Resume() error {
 		return fmt.Errorf("failed to start new session: %w", err)
 	}
 
-	i.Status = Running
+	i.SetStatus(Running)
 	return nil
 }

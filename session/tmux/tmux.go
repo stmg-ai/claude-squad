@@ -1,7 +1,9 @@
 package tmux
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"io"
@@ -30,6 +32,8 @@ type TmuxSession struct {
 	// stdout dimensions of the tmux pane. On detach, we close it and set a new one.
 	// This should never be nil.
 	ptmx *os.File
+	// monitor monitors the tmux pane content and sends signals to the UI when it's status changes
+	monitor *statusMonitor
 
 	// Initialized by Attach
 	// Deinitilaized by Detach
@@ -107,7 +111,40 @@ func (t *TmuxSession) Restore() error {
 		return fmt.Errorf("error opening PTY: %w", err)
 	}
 	t.ptmx = ptmx
+	t.monitor = newStatusMonitor()
 	return nil
+}
+
+type statusMonitor struct {
+	// Store hashes to save memory.
+	prevOutputHash []byte
+}
+
+func newStatusMonitor() *statusMonitor {
+	return &statusMonitor{}
+}
+
+// hash hashes the string.
+func (m *statusMonitor) hash(s string) []byte {
+	h := sha256.New()
+	// TODO: this allocation sucks since the string is probably large. Ideally, we hash the string directly.
+	h.Write([]byte(s))
+	return h.Sum(nil)
+}
+
+// HasUpdated checks if the tmux pane content has changed since the last tick.
+func (t *TmuxSession) HasUpdated() bool {
+	content, err := t.CapturePaneContent()
+	if err != nil {
+		log.Printf("error capturing pane content in status monitor: %v", err)
+		return false
+	}
+
+	if !bytes.Equal(t.monitor.hash(content), t.monitor.prevOutputHash) {
+		t.monitor.prevOutputHash = t.monitor.hash(content)
+		return true
+	}
+	return false
 }
 
 func (t *TmuxSession) Attach() (chan struct{}, error) {
