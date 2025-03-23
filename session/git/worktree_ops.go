@@ -46,7 +46,6 @@ func (g *GitWorktree) SetupFromExistingBranch() error {
 		return fmt.Errorf("failed to create worktree from branch %s: %w", g.branchName, err)
 	}
 
-	g.checkedOut = true
 	return nil
 }
 
@@ -87,7 +86,6 @@ func (g *GitWorktree) SetupNewWorktree() error {
 		return fmt.Errorf("failed to create worktree from branch %s: %w", currentBranch, err)
 	}
 
-	g.checkedOut = true
 	return nil
 }
 
@@ -133,7 +131,6 @@ func (g *GitWorktree) Cleanup() error {
 		return g.combineErrors(errs)
 	}
 
-	g.checkedOut = false
 	return nil
 }
 
@@ -144,7 +141,6 @@ func (g *GitWorktree) Remove() error {
 		return fmt.Errorf("failed to remove worktree: %w", err)
 	}
 
-	g.checkedOut = false
 	return nil
 }
 

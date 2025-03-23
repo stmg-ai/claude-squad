@@ -81,13 +81,9 @@ func (g *GitWorktree) IsDirty() (bool, error) {
 
 // IsBranchCheckedOut checks if the instance branch is currently checked out
 func (g *GitWorktree) IsBranchCheckedOut() (bool, error) {
-	if g.checkedOut {
-		return true, nil
-	} else {
-		output, err := g.runGitCommand(g.repoPath, "branch", "--show-current")
-		if err != nil {
-			return false, fmt.Errorf("failed to get current branch: %w", err)
-		}
-		return strings.TrimSpace(string(output)) == g.branchName, nil
+	output, err := g.runGitCommand(g.repoPath, "branch", "--show-current")
+	if err != nil {
+		return false, fmt.Errorf("failed to get current branch: %w", err)
 	}
+	return strings.TrimSpace(string(output)) == g.branchName, nil
 }
