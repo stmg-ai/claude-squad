@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -101,7 +102,31 @@ func (t *TmuxSession) Start(program string, workDir string) error {
 	}
 	ptmx.Close()
 
-	return t.Restore()
+	err = t.Restore()
+	if err != nil {
+		if cleanupErr := t.Close(); cleanupErr != nil {
+			err = fmt.Errorf("%v (cleanup error: %v)", err, cleanupErr)
+		}
+		return fmt.Errorf("error restoring tmux session: %w", err)
+	}
+
+	// Deal with "do you trust the files" screen by sending an enter keystroke. Try 5 times.
+	for i := 0; i < 5; i++ {
+		time.Sleep(100 * time.Millisecond)
+		content, err := t.CapturePaneContent()
+		if err != nil {
+			log.Printf("could not check 'do you trust the files screen': %v", err)
+		}
+		if strings.Contains(content, "Do you trust") {
+			_, err := t.ptmx.Write([]byte{0x0D})
+			if err != nil {
+				log.Printf("could not send enter keystroke to PTY: %v", err)
+			}
+			break
+		}
+	}
+
+	return nil
 }
 
 // Restore attaches to an existing session and restores the window size
