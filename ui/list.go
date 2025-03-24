@@ -139,23 +139,37 @@ func (r *InstanceRenderer) Render(i *session.Instance, idx int, selected bool, h
 		join,
 	))
 
-	// TODO: store these in the Instance and update them periodically.
-	addedLines := 101
-	removedLines := 102
+	stat := i.GetDiffStats()
 
-	addedDiff := fmt.Sprintf("+%d", addedLines)
-	removedDiff := fmt.Sprintf("-%d ", removedLines)
-	diff := lipgloss.JoinHorizontal(
-		lipgloss.Center,
-		addedLinesStyle.Background(descS.GetBackground()).Render(addedDiff),
-		lipgloss.Style{}.Background(descS.GetBackground()).Foreground(descS.GetForeground()).Render(","),
-		removedLinesStyle.Background(descS.GetBackground()).Render(removedDiff),
-	)
+	var diff string
+	var addedDiff, removedDiff string
+	if stat == nil || stat.Error != nil || stat.IsEmpty() {
+		// Don't show diff stats if there's an error or if they don't exist
+		addedDiff = ""
+		removedDiff = ""
+		diff = ""
+	} else {
+		addedDiff = fmt.Sprintf("+%d", stat.Added)
+		removedDiff = fmt.Sprintf("-%d ", stat.Removed)
+		diff = lipgloss.JoinHorizontal(
+			lipgloss.Center,
+			addedLinesStyle.Background(descS.GetBackground()).Render(addedDiff),
+			lipgloss.Style{}.Background(descS.GetBackground()).Foreground(descS.GetForeground()).Render(","),
+			removedLinesStyle.Background(descS.GetBackground()).Render(removedDiff),
+		)
+	}
 
 	remainingWidth := r.width
 	remainingWidth -= len(prefix)
 	remainingWidth -= len(branchIcon)
-	remainingWidth -= len(addedDiff) + len(removedDiff) + 1
+
+	diffWidth := len(addedDiff) + len(removedDiff)
+	if diffWidth > 0 {
+		diffWidth += 1
+	}
+
+	// Use fixed width for diff stats to avoid layout issues
+	remainingWidth -= diffWidth
 
 	branch := i.Branch
 	if i.Started() && hasMultipleRepos {

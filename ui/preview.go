@@ -8,21 +8,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-var fallBackText = lipgloss.JoinVertical(lipgloss.Center, `
-░█████╗░██╗░░░░░░█████╗░██╗░░░██╗██████╗░███████╗
-██╔══██╗██║░░░░░██╔══██╗██║░░░██║██╔══██╗██╔════╝
-██║░░╚═╝██║░░░░░███████║██║░░░██║██║░░██║█████╗░░
-██║░░██╗██║░░░░░██╔══██║██║░░░██║██║░░██║██╔══╝░░
-╚█████╔╝███████╗██║░░██║╚██████╔╝██████╔╝███████╗
-░╚════╝░╚══════╝╚═╝░░╚═╝░╚═════╝░╚═════╝░╚══════╝
-`, `
-░██████╗░██████╗░██╗░░░██╗░█████╗░██████╗░
-██╔════╝██╔═══██╗██║░░░██║██╔══██╗██╔══██╗
-╚█████╗░██║██╗██║██║░░░██║███████║██║░░██║
-░╚═══██╗╚██████╔╝██║░░░██║██╔══██║██║░░██║
-██████╔╝░╚═██╔═╝░╚██████╔╝██║░░██║██████╔╝
-`)
-
 var previewPaneStyle = lipgloss.NewStyle().
 	Foreground(lipgloss.AdaptiveColor{Light: "#1a1a1a", Dark: "#dddddd"})
 
@@ -53,7 +38,7 @@ func (p *PreviewPane) SetSize(width, maxHeight int) {
 func (p *PreviewPane) setFallbackState(message string) {
 	p.previewState = previewState{
 		fallback: true,
-		text:     lipgloss.JoinVertical(lipgloss.Center, fallBackText, "", message),
+		text:     lipgloss.JoinVertical(lipgloss.Center, FallBackText, "", message),
 	}
 }
 

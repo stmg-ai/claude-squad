@@ -11,10 +11,18 @@ import (
 
 // GitWorktreeData represents the serializable data of a GitWorktree
 type GitWorktreeData struct {
-	RepoPath     string
-	WorktreePath string
-	SessionName  string
-	BranchName   string
+	RepoPath      string
+	WorktreePath  string
+	SessionName   string
+	BranchName    string
+	BaseCommitSHA string
+}
+
+// DiffStatsData represents the serializable data of a DiffStats
+type DiffStatsData struct {
+	Added   int
+	Removed int
+	Content string
 }
 
 // InstanceData represents the serializable data of an Instance
@@ -29,6 +37,7 @@ type InstanceData struct {
 	UpdatedAt time.Time
 	Program   string
 	Worktree  GitWorktreeData
+	DiffStats DiffStatsData
 }
 
 // Storage handles saving and loading instances

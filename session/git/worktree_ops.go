@@ -76,6 +76,7 @@ func (g *GitWorktree) SetupNewWorktree() error {
 		return fmt.Errorf("failed to get HEAD commit hash: %w", err)
 	}
 	headCommit := strings.TrimSpace(string(output))
+	g.baseCommitSHA = headCommit
 
 	// Create a new worktree from the HEAD commit
 	// Otherwise, we'll inherit uncommitted changes from the previous worktree.

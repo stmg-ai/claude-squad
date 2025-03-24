@@ -27,14 +27,17 @@ type GitWorktree struct {
 	sessionName string
 	// Branch name for the worktree
 	branchName string
+	// Base commit hash for the worktree
+	baseCommitSHA string
 }
 
-func NewGitWorktreeFromStorage(repoPath string, worktreePath string, sessionName string, branchName string) *GitWorktree {
+func NewGitWorktreeFromStorage(repoPath string, worktreePath string, sessionName string, branchName string, baseCommitSHA string) *GitWorktree {
 	return &GitWorktree{
-		repoPath:     repoPath,
-		worktreePath: worktreePath,
-		sessionName:  sessionName,
-		branchName:   branchName,
+		repoPath:      repoPath,
+		worktreePath:  worktreePath,
+		sessionName:   sessionName,
+		branchName:    branchName,
+		baseCommitSHA: baseCommitSHA,
 	}
 }
 
@@ -85,4 +88,9 @@ func (g *GitWorktree) GetRepoPath() string {
 // GetRepoName returns the name of the repository (last part of the repoPath).
 func (g *GitWorktree) GetRepoName() string {
 	return filepath.Base(g.repoPath)
+}
+
+// GetBaseCommitSHA returns the base commit SHA for the worktree
+func (g *GitWorktree) GetBaseCommitSHA() string {
+	return g.baseCommitSHA
 }

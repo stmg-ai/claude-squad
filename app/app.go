@@ -73,7 +73,7 @@ func newHome(ctx context.Context, program string) *home {
 		ctx:          ctx,
 		spinner:      spinner.New(spinner.WithSpinner(spinner.MiniDot)),
 		menu:         ui.NewMenu(),
-		tabbedWindow: ui.NewTabbedWindow(ui.NewPreviewPane()),
+		tabbedWindow: ui.NewTabbedWindow(ui.NewPreviewPane(), ui.NewDiffPane()),
 		errBox:       ui.NewErrBox(),
 		storage:      storage,
 		program:      program,
@@ -127,7 +127,7 @@ func (m *home) Init() tea.Cmd {
 			time.Sleep(100 * time.Millisecond)
 			return previewTickMsg{}
 		},
-		tickStatusesCmd,
+		tickUpdateMetadataCmd,
 	)
 }
 
@@ -146,7 +146,7 @@ func (m *home) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return previewTickMsg{}
 			},
 		)
-	case tickStatusesMessage:
+	case tickUpdateMetadataMessage:
 		for _, instance := range m.list.GetInstances() {
 			if !instance.Started() || instance.Paused() {
 				continue
@@ -156,8 +156,11 @@ func (m *home) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				instance.SetStatus(session.Ready)
 			}
+			if err := instance.UpdateDiffStats(); err != nil {
+				log.Printf("could not update diff stats: %v", err)
+			}
 		}
-		return m, tickStatusesCmd
+		return m, tickUpdateMetadataCmd
 	case tea.KeyMsg:
 		return m.handleKeyPress(msg)
 	case tea.WindowSizeMsg:
@@ -258,8 +261,19 @@ func (m *home) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case keys.KeyDown:
 		m.list.Down()
 		return m.updatePreview()
+	case keys.KeyShiftUp:
+		if m.tabbedWindow.IsInDiffTab() {
+			m.tabbedWindow.ScrollUp()
+		}
+		return m.updatePreview()
+	case keys.KeyShiftDown:
+		if m.tabbedWindow.IsInDiffTab() {
+			m.tabbedWindow.ScrollDown()
+		}
+		return m.updatePreview()
 	case keys.KeyTab:
 		m.tabbedWindow.Toggle()
+		m.menu.SetInDiffTab(m.tabbedWindow.IsInDiffTab())
 		return m.updatePreview()
 	case keys.KeyKill:
 		selected := m.list.GetSelectedInstance()
@@ -354,6 +368,10 @@ func (m *home) updatePreview() (tea.Model, tea.Cmd) {
 		return m.showErrorMessageForShortTime(err)
 	}
 
+	if err := m.tabbedWindow.UpdateDiff(selected); err != nil {
+		return m.showErrorMessageForShortTime(err)
+	}
+
 	// Update menu with current instance
 	m.menu.SetInstance(selected)
 	return m, nil
@@ -365,13 +383,13 @@ type hideErrMsg struct{}
 // previewTickMsg implements tea.Msg and triggers a preview update
 type previewTickMsg struct{}
 
-type tickStatusesMessage struct{}
+type tickUpdateMetadataMessage struct{}
 
-// tickStatusesCmd is the callback to update the statuses of the instances every 500ms. Note that we iterate
+// tickUpdateMetadataCmd is the callback to update the metadata of the instances every 500ms. Note that we iterate
 // overall the instances and capture their output. It's a pretty expensive operation. Let's do it 2x a second only.
-var tickStatusesCmd = func() tea.Msg {
+var tickUpdateMetadataCmd = func() tea.Msg {
 	time.Sleep(500 * time.Millisecond)
-	return tickStatusesMessage{}
+	return tickUpdateMetadataMessage{}
 }
 
 // showErrorMessageForShortTime sets the error message. We return a callback. I assume bubbletea calls the
