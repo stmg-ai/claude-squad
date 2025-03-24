@@ -71,19 +71,18 @@ func (g *GitWorktree) SetupNewWorktree() error {
 		return fmt.Errorf("failed to cleanup existing branch: %w", err)
 	}
 
-	// Get current branch name
-	output, err := g.runGitCommand(g.repoPath, "branch", "--show-current")
+	output, err := g.runGitCommand(g.repoPath, "rev-parse", "HEAD")
 	if err != nil {
-		return fmt.Errorf("failed to get current branch: %w", err)
+		return fmt.Errorf("failed to get HEAD commit hash: %w", err)
 	}
-	currentBranch := strings.TrimSpace(string(output))
-	if currentBranch == "" {
-		return fmt.Errorf("not currently on any branch")
-	}
+	headCommit := strings.TrimSpace(string(output))
 
-	// Create a new worktree from the current branch
-	if _, err := g.runGitCommand(g.repoPath, "worktree", "add", "-b", g.branchName, g.worktreePath, currentBranch); err != nil {
-		return fmt.Errorf("failed to create worktree from branch %s: %w", currentBranch, err)
+	// Create a new worktree from the HEAD commit
+	// Otherwise, we'll inherit uncommitted changes from the previous worktree.
+	// This way, we can start the worktree with a clean slate.
+	// TODO: we might want to give an option to use main/master instead of the current branch.
+	if _, err := g.runGitCommand(g.repoPath, "worktree", "add", "-b", g.branchName, g.worktreePath, headCommit); err != nil {
+		return fmt.Errorf("failed to create worktree from commit %s: %w", headCommit, err)
 	}
 
 	return nil
