@@ -17,6 +17,12 @@ const pausedIcon = "⏸ "
 var readyStyle = lipgloss.NewStyle().
 	Foreground(lipgloss.AdaptiveColor{Light: "#51bd73", Dark: "#51bd73"})
 
+var addedLinesStyle = lipgloss.NewStyle().
+	Foreground(lipgloss.AdaptiveColor{Light: "#51bd73", Dark: "#51bd73"})
+
+var removedLinesStyle = lipgloss.NewStyle().
+	Foreground(lipgloss.Color("#de613e"))
+
 var pausedStyle = lipgloss.NewStyle().
 	Foreground(lipgloss.AdaptiveColor{Light: "#888888", Dark: "#888888"})
 
@@ -128,16 +134,51 @@ func (r *InstanceRenderer) Render(i *session.Instance, idx int, selected bool) s
 		join,
 	))
 
+	// TODO: store these in the Instance and update them periodically.
+	addedLines := 101
+	removedLines := 102
+
+	addedDiff := fmt.Sprintf("+%d", addedLines)
+	removedDiff := fmt.Sprintf("-%d ", removedLines)
+	diff := lipgloss.JoinHorizontal(
+		lipgloss.Center,
+		addedLinesStyle.Background(descS.GetBackground()).Render(addedDiff),
+		lipgloss.Style{}.Background(descS.GetBackground()).Foreground(descS.GetForeground()).Render(","),
+		removedLinesStyle.Background(descS.GetBackground()).Render(removedDiff),
+	)
+
+	remainingWidth := r.width
+	remainingWidth -= len(prefix)
+	remainingWidth -= len(branchIcon)
+	remainingWidth -= len(addedDiff) + len(removedDiff) + 1
+
+	branch := i.Branch
+	// Don't show branch if there's no space for it. Or show ellipsis if it's too long.
+	if remainingWidth < 0 {
+		branch = ""
+	} else if remainingWidth < len(branch) {
+		if remainingWidth < 3 {
+			branch = ""
+		} else {
+			// We know the remainingWidth is at least 4 and branch is longer than that, so this is safe.
+			branch = branch[:remainingWidth-3] + "..."
+		}
+	}
+	remainingWidth -= len(branch)
+
+	// Add spaces to fill the remaining width.
+	spaces := ""
+	if remainingWidth > 0 {
+		spaces = strings.Repeat(" ", remainingWidth)
+	}
+
+	branchLine := fmt.Sprintf("%s %s-%s%s%s", strings.Repeat(" ", len(prefix)), branchIcon, branch, spaces, diff)
+
 	// join title and subtitle
 	text := lipgloss.JoinVertical(
 		lipgloss.Left,
 		title,
-		descS.Render(
-			lipgloss.Place(
-				r.width, 1,
-				lipgloss.Left, lipgloss.Center,
-				fmt.Sprintf("%s %s-%s", strings.Repeat(" ", len(prefix)), branchIcon, i.Branch)),
-		),
+		descS.Render(branchLine),
 	)
 
 	return text
