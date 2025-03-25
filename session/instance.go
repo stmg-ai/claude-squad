@@ -8,6 +8,7 @@ import (
 
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"errors"
@@ -49,6 +50,9 @@ type Instance struct {
 	// UpdatedAt is the time the instance was last updated.
 	UpdatedAt time.Time
 
+	// DiffStats stores the current git diff statistics
+	diffStats *git.DiffStats
+
 	// The below fields are initialized upon calling Start().
 
 	started bool
@@ -60,7 +64,7 @@ type Instance struct {
 
 // ToInstanceData converts an Instance to its serializable form
 func (i *Instance) ToInstanceData() InstanceData {
-	return InstanceData{
+	data := InstanceData{
 		Title:     i.Title,
 		Path:      i.Path,
 		Branch:    i.Branch,
@@ -70,13 +74,29 @@ func (i *Instance) ToInstanceData() InstanceData {
 		CreatedAt: i.CreatedAt,
 		UpdatedAt: time.Now(),
 		Program:   i.Program,
-		Worktree: GitWorktreeData{
-			RepoPath:     i.gitWorktree.GetRepoPath(),
-			WorktreePath: i.gitWorktree.GetWorktreePath(),
-			SessionName:  i.Title,
-			BranchName:   i.gitWorktree.GetBranchName(),
-		},
 	}
+
+	// Only include worktree data if gitWorktree is initialized
+	if i.gitWorktree != nil {
+		data.Worktree = GitWorktreeData{
+			RepoPath:      i.gitWorktree.GetRepoPath(),
+			WorktreePath:  i.gitWorktree.GetWorktreePath(),
+			SessionName:   i.Title,
+			BranchName:    i.gitWorktree.GetBranchName(),
+			BaseCommitSHA: i.gitWorktree.GetBaseCommitSHA(),
+		}
+	}
+
+	// Only include diff stats if they exist
+	if i.diffStats != nil {
+		data.DiffStats = DiffStatsData{
+			Added:   i.diffStats.Added,
+			Removed: i.diffStats.Removed,
+			Content: i.diffStats.Content,
+		}
+	}
+
+	return data
 }
 
 // FromInstanceData creates a new Instance from serialized data
@@ -96,7 +116,13 @@ func FromInstanceData(data InstanceData) (*Instance, error) {
 			data.Worktree.WorktreePath,
 			data.Worktree.SessionName,
 			data.Worktree.BranchName,
+			data.Worktree.BaseCommitSHA,
 		),
+		diffStats: &git.DiffStats{
+			Added:   data.DiffStats.Added,
+			Removed: data.DiffStats.Removed,
+			Content: data.DiffStats.Content,
+		},
 	}
 
 	if instance.Paused() {
@@ -415,4 +441,35 @@ func (i *Instance) Resume() error {
 
 	i.SetStatus(Running)
 	return nil
+}
+
+// UpdateDiffStats updates the git diff statistics for this instance
+func (i *Instance) UpdateDiffStats() error {
+	if !i.started {
+		i.diffStats = nil
+		return nil
+	}
+
+	if i.Status == Paused {
+		// Keep the previous diff stats if the instance is paused
+		return nil
+	}
+
+	stats := i.gitWorktree.Diff()
+	if stats.Error != nil {
+		if strings.Contains(stats.Error.Error(), "base commit SHA not set") {
+			// Worktree is not fully set up yet, not an error
+			i.diffStats = nil
+			return nil
+		}
+		return fmt.Errorf("failed to get diff stats: %w", stats.Error)
+	}
+
+	i.diffStats = stats
+	return nil
+}
+
+// GetDiffStats returns the current git diff statistics
+func (i *Instance) GetDiffStats() *git.DiffStats {
+	return i.diffStats
 }

@@ -22,23 +22,29 @@ const (
 
 	KeyPause
 	KeyResume
+
+	// Diff keybindings
+	KeyShiftUp
+	KeyShiftDown
 )
 
 // GlobalKeyStringsMap is a global, immutable map string to keybinding.
 var GlobalKeyStringsMap = map[string]KeyName{
-	"up":    KeyUp,
-	"k":     KeyUp,
-	"down":  KeyDown,
-	"j":     KeyDown,
-	"enter": KeyEnter,
-	"o":     KeyEnter,
-	"n":     KeyNew,
-	"d":     KeyKill,
-	"q":     KeyQuit,
-	"tab":   KeyTab,
-	"p":     KeyPause,
-	"r":     KeyResume,
-	"s":     KeySubmit,
+	"up":         KeyUp,
+	"k":          KeyUp,
+	"down":       KeyDown,
+	"j":          KeyDown,
+	"shift+up":   KeyShiftUp,
+	"shift+down": KeyShiftDown,
+	"enter":      KeyEnter,
+	"o":          KeyEnter,
+	"n":          KeyNew,
+	"d":          KeyKill,
+	"q":          KeyQuit,
+	"tab":        KeyTab,
+	"p":          KeyPause,
+	"r":          KeyResume,
+	"s":          KeySubmit,
 }
 
 // GlobalkeyBindings is a global, immutable map of KeyName tot keybinding.
@@ -50,6 +56,14 @@ var GlobalkeyBindings = map[KeyName]key.Binding{
 	KeyDown: key.NewBinding(
 		key.WithKeys("down", "j"),
 		key.WithHelp("↓/j", "down"),
+	),
+	KeyShiftUp: key.NewBinding(
+		key.WithKeys("shift+up"),
+		key.WithHelp("shift+↑", "scroll up diff"),
+	),
+	KeyShiftDown: key.NewBinding(
+		key.WithKeys("shift+down"),
+		key.WithHelp("shift+↓", "scroll down diff"),
 	),
 	KeyEnter: key.NewBinding(
 		key.WithKeys("enter", "o"),

@@ -2,6 +2,7 @@ package ui
 
 import (
 	"claude-squad/session"
+
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -29,6 +30,11 @@ var (
 			Border(lipgloss.NormalBorder(), false, true, true, true)
 )
 
+const (
+	PreviewTab = iota
+	DiffTab
+)
+
 type Tab struct {
 	Name   string
 	Render func(width int, height int) string
@@ -44,15 +50,17 @@ type TabbedWindow struct {
 	width     int
 
 	preview *PreviewPane
+	diff    *DiffPane
 }
 
-func NewTabbedWindow(preview *PreviewPane) *TabbedWindow {
+func NewTabbedWindow(preview *PreviewPane, diff *DiffPane) *TabbedWindow {
 	return &TabbedWindow{
 		tabs: []string{
-			"Claude Preview",
-			"Current Diff",
+			"Preview",
+			"Diff",
 		},
 		preview: preview,
+		diff:    diff,
 	}
 }
 
@@ -65,10 +73,16 @@ func (w *TabbedWindow) SetSize(width, height int) {
 	w.width = AdjustPreviewWidth(width)
 	w.height = height
 
-	w.preview.SetSize(
-		w.width-windowStyle.GetHorizontalFrameSize(),
-		height-activeTabStyle.GetVerticalFrameSize(),
-	)
+	// Calculate the content height by subtracting:
+	// 1. Tab height (including border and padding)
+	// 2. Window style vertical frame size
+	// 3. Additional padding/spacing (2 for the newline and spacing)
+	tabHeight := activeTabStyle.GetVerticalFrameSize() + 1
+	contentHeight := height - tabHeight - windowStyle.GetVerticalFrameSize() - 2
+	contentWidth := w.width - windowStyle.GetHorizontalFrameSize()
+
+	w.preview.SetSize(contentWidth, contentHeight)
+	w.diff.SetSize(contentWidth, contentHeight)
 }
 
 func (w *TabbedWindow) GetPreviewSize() (width, height int) {
@@ -80,10 +94,35 @@ func (w *TabbedWindow) Toggle() {
 }
 
 func (w *TabbedWindow) UpdatePreview(instance *session.Instance) error {
-	if w.activeTab != 0 {
+	if w.activeTab != PreviewTab {
 		return nil
 	}
 	return w.preview.UpdateContent(instance)
+}
+
+func (w *TabbedWindow) UpdateDiff(instance *session.Instance) error {
+	if w.activeTab != DiffTab {
+		return nil
+	}
+	return w.diff.SetDiff(instance)
+}
+
+// Add these new methods for handling scroll events
+func (w *TabbedWindow) ScrollUp() {
+	if w.activeTab == 1 { // Diff tab
+		w.diff.ScrollUp()
+	}
+}
+
+func (w *TabbedWindow) ScrollDown() {
+	if w.activeTab == 1 { // Diff tab
+		w.diff.ScrollDown()
+	}
+}
+
+// IsInDiffTab returns true if the diff tab is currently active
+func (w *TabbedWindow) IsInDiffTab() bool {
+	return w.activeTab == 1
 }
 
 func (w *TabbedWindow) String() string {
@@ -130,7 +169,7 @@ func (w *TabbedWindow) String() string {
 	if w.activeTab == 0 {
 		content = w.preview.String()
 	} else {
-		content = "No content"
+		content = w.diff.String()
 	}
 	window := windowStyle.Render(
 		lipgloss.Place(
