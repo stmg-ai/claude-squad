@@ -54,12 +54,17 @@ type List struct {
 	selectedIdx   int
 	height, width int
 	renderer      *InstanceRenderer
+
+	// map of repo name to number of instances using it. Used to display the repo name only if there are
+	// multiple repos in play.
+	repos map[string]int
 }
 
 func NewList(spinner *spinner.Model) *List {
 	return &List{
 		items:    []*session.Instance{},
 		renderer: &InstanceRenderer{spinner: spinner},
+		repos:    make(map[string]int),
 	}
 }
 
@@ -103,7 +108,7 @@ func (r *InstanceRenderer) setWidth(width int) {
 // ɹ and ɻ are other options.
 const branchIcon = "Ꮧ"
 
-func (r *InstanceRenderer) Render(i *session.Instance, idx int, selected bool) string {
+func (r *InstanceRenderer) Render(i *session.Instance, idx int, selected bool, hasMultipleRepos bool) string {
 	prefix := fmt.Sprintf(" %d. ", idx)
 	if idx >= 10 {
 		prefix = prefix[:len(prefix)-1]
@@ -153,6 +158,14 @@ func (r *InstanceRenderer) Render(i *session.Instance, idx int, selected bool) s
 	remainingWidth -= len(addedDiff) + len(removedDiff) + 1
 
 	branch := i.Branch
+	if i.Started() && hasMultipleRepos {
+		repoName, err := i.RepoName()
+		if err != nil {
+			log.Printf("could not get repo name in instance renderer: %v", err)
+		} else {
+			branch += fmt.Sprintf(" (%s)", repoName)
+		}
+	}
 	// Don't show branch if there's no space for it. Or show ellipsis if it's too long.
 	if remainingWidth < 0 {
 		branch = ""
@@ -195,7 +208,7 @@ func (l *List) String() string {
 
 	// Render the list.
 	for i, item := range l.items {
-		b.WriteString(l.renderer.Render(item, i+1, i == l.selectedIdx))
+		b.WriteString(l.renderer.Render(item, i+1, i == l.selectedIdx, len(l.repos) > 1))
 		if i != len(l.items)-1 {
 			b.WriteString("\n\n")
 		}
@@ -229,6 +242,15 @@ func (l *List) Kill() {
 	if l.selectedIdx == len(l.items)-1 {
 		defer l.Up()
 	}
+
+	// Unregister the reponame.
+	repoName, err := targetInstance.RepoName()
+	if err != nil {
+		log.Printf("could not get repo name: %v", err)
+	} else {
+		l.rmRepo(repoName)
+	}
+
 	// Since there's items after this, the selectedIdx can stay the same.
 	l.items = append(l.items[:l.selectedIdx], l.items[l.selectedIdx+1:]...)
 }
@@ -248,9 +270,39 @@ func (l *List) Up() {
 	}
 }
 
-// AddInstance adds a new instance to the list
-func (l *List) AddInstance(instance *session.Instance) {
+func (l *List) addRepo(repo string) {
+	if _, ok := l.repos[repo]; !ok {
+		l.repos[repo] = 0
+	}
+	l.repos[repo]++
+}
+
+func (l *List) rmRepo(repo string) {
+	if _, ok := l.repos[repo]; !ok {
+		log.Printf("repo %s not found", repo)
+		return
+	}
+	l.repos[repo]--
+	if l.repos[repo] == 0 {
+		delete(l.repos, repo)
+	}
+}
+
+// AddInstance adds a new instance to the list. It returns a finalizer function that should be called when the instance
+// is started. If the instance was restored from storage or is paused, you can call the finalizer immediately.
+// When creating a new one and entering the name, you want to call the finalizer once the name is done.
+func (l *List) AddInstance(instance *session.Instance) (finalize func()) {
 	l.items = append(l.items, instance)
+	// The finalizer registers the repo name once the instance is started.
+	return func() {
+		repoName, err := instance.RepoName()
+		if err != nil {
+			log.Printf("could not get repo name: %v", err)
+			return
+		}
+
+		l.addRepo(repoName)
+	}
 }
 
 // GetSelectedInstance returns the currently selected instance

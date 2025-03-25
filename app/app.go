@@ -52,6 +52,9 @@ type home struct {
 
 	// state
 	state state
+	// newInstanceFinalizer is called when the state is stateNew and then you press enter.
+	// It registers the new instance in the list after the instance has been started.
+	newInstanceFinalizer func()
 }
 
 func newHome(ctx context.Context, program string) *home {
@@ -87,7 +90,8 @@ func newHome(ctx context.Context, program string) *home {
 
 	// Add loaded instances to the list
 	for _, instance := range instances {
-		h.list.AddInstance(instance)
+		// Call the finalizer immediately.
+		h.list.AddInstance(instance)()
 	}
 
 	return h
@@ -201,6 +205,8 @@ func (m *home) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if err := m.storage.SaveInstances(m.list.GetInstances()); err != nil {
 				return m.showErrorMessageForShortTime(err)
 			}
+			// Instance added successfully, call the finalizer.
+			m.newInstanceFinalizer()
 			return m, tea.WindowSize()
 		case tea.KeyRunes:
 			if len(instance.Title) >= 20 {
@@ -283,7 +289,7 @@ func (m *home) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m.showErrorMessageForShortTime(err)
 		}
 
-		m.list.AddInstance(instance)
+		m.newInstanceFinalizer = m.list.AddInstance(instance)
 		m.list.SetSelectedInstance(m.list.NumInstances() - 1)
 		m.state = stateNew
 		m.menu.SetState(ui.StateNewInstance)
