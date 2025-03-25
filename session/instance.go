@@ -1,9 +1,9 @@
 package session
 
 import (
+	"claude-squad/log"
 	"claude-squad/session/git"
 	"claude-squad/session/tmux"
-	"log"
 	"path/filepath"
 
 	"fmt"
@@ -371,13 +371,13 @@ func (i *Instance) Pause() error {
 	// Check if there are any changes to commit
 	if dirty, err := i.gitWorktree.IsDirty(); err != nil {
 		errs = append(errs, fmt.Errorf("failed to check if worktree is dirty: %w", err))
-		log.Println(err)
+		log.Error(err)
 	} else if dirty {
 		// Commit changes with timestamp
 		commitMsg := fmt.Sprintf("Update from session %s at %s (paused)", i.Title, time.Now().Format(time.RFC3339))
 		if err := i.gitWorktree.PushChanges(commitMsg); err != nil {
 			errs = append(errs, fmt.Errorf("failed to commit changes: %w", err))
-			log.Println(err)
+			log.Error(err)
 			// Return early if we can't commit changes to avoid corrupted state
 			return i.combineErrors(errs)
 		}
@@ -386,7 +386,7 @@ func (i *Instance) Pause() error {
 	// Close tmux session first since it's using the git worktree
 	if err := i.tmuxSession.Close(); err != nil {
 		errs = append(errs, fmt.Errorf("failed to close tmux session: %w", err))
-		log.Println(err)
+		log.Error(err)
 		// Return early if we can't close tmux to avoid corrupted state
 		return i.combineErrors(errs)
 	}
@@ -396,20 +396,20 @@ func (i *Instance) Pause() error {
 		// Remove worktree but keep branch
 		if err := i.gitWorktree.Remove(); err != nil {
 			errs = append(errs, fmt.Errorf("failed to remove git worktree: %w", err))
-			log.Println(err)
+			log.Error(err)
 			return i.combineErrors(errs)
 		}
 
 		// Only prune if remove was successful
 		if err := i.gitWorktree.Prune(); err != nil {
 			errs = append(errs, fmt.Errorf("failed to prune git worktrees: %w", err))
-			log.Println(err)
+			log.Error(err)
 			return i.combineErrors(errs)
 		}
 	}
 
 	if err := i.combineErrors(errs); err != nil {
-		log.Println(err)
+		log.Error(err)
 		return err
 	}
 
@@ -429,7 +429,7 @@ func (i *Instance) Resume() error {
 
 	// Check if branch is checked out
 	if checked, err := i.gitWorktree.IsBranchCheckedOut(); err != nil {
-		log.Println(err)
+		log.Error(err)
 		return fmt.Errorf("failed to check if branch is checked out: %w", err)
 	} else if checked {
 		return fmt.Errorf("cannot resume: branch is checked out, please switch to a different branch")
@@ -437,17 +437,17 @@ func (i *Instance) Resume() error {
 
 	// Setup git worktree
 	if err := i.gitWorktree.Setup(); err != nil {
-		log.Println(err)
+		log.Error(err)
 		return fmt.Errorf("failed to setup git worktree: %w", err)
 	}
 
 	// Create new tmux session
 	if err := i.tmuxSession.Start(i.Program, i.gitWorktree.GetWorktreePath()); err != nil {
-		log.Println(err)
+		log.Error(err)
 		// Cleanup git worktree if tmux session creation fails
 		if cleanupErr := i.gitWorktree.Cleanup(); cleanupErr != nil {
 			err = fmt.Errorf("%v (cleanup error: %v)", err, cleanupErr)
-			log.Println(err)
+			log.Error(err)
 		}
 		return fmt.Errorf("failed to start new session: %w", err)
 	}

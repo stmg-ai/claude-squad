@@ -1,9 +1,9 @@
 package config
 
 import (
+	"claude-squad/log"
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 )
@@ -47,7 +47,7 @@ func LoadConfig() (*Config, error) {
 			// Create and save default config if file doesn't exist
 			defaultCfg := DefaultConfig()
 			if saveErr := SaveConfig(defaultCfg); saveErr != nil {
-				log.Printf("Warning: failed to save default config: %v", saveErr)
+				log.Errorf("Warning: failed to save default config: %v", saveErr)
 			}
 			return defaultCfg, nil
 		}

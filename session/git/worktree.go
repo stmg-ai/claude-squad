@@ -2,8 +2,8 @@ package git
 
 import (
 	"claude-squad/config"
+	"claude-squad/log"
 	"fmt"
-	"log"
 	"path/filepath"
 	"time"
 )
@@ -49,7 +49,7 @@ func NewGitWorktree(repoPath string, sessionName string) (tree *GitWorktree, bra
 	// Convert repoPath to absolute path
 	absPath, err := filepath.Abs(repoPath)
 	if err != nil {
-		log.Printf("git worktree path abs error, falling back to repoPath %s: %s", repoPath, err)
+		log.Errorf("git worktree path abs error, falling back to repoPath %s: %s", repoPath, err)
 		// If we can't get absolute path, use original path as fallback
 		absPath = repoPath
 	}

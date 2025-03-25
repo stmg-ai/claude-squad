@@ -3,14 +3,13 @@ package main
 import (
 	"claude-squad/app"
 	"claude-squad/config"
-	"claude-squad/logger"
+	"claude-squad/log"
 	"claude-squad/session"
 	"claude-squad/session/git"
 	"claude-squad/session/tmux"
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
@@ -25,8 +24,8 @@ var (
 		Short: "Claude Squad - A terminal-based session manager",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()
-			logger.Initialize()
-			defer logger.Close()
+			log.Initialize()
+			defer log.Close()
 
 			cfg, err := config.LoadConfig()
 			if err != nil {
