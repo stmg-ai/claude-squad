@@ -49,6 +49,8 @@ type Instance struct {
 	CreatedAt time.Time
 	// UpdatedAt is the time the instance was last updated.
 	UpdatedAt time.Time
+	// AutoYes is true if the instance should automatically press enter when prompted.
+	AutoYes bool
 
 	// DiffStats stores the current git diff statistics
 	diffStats *git.DiffStats
@@ -74,6 +76,7 @@ func (i *Instance) ToInstanceData() InstanceData {
 		CreatedAt: i.CreatedAt,
 		UpdatedAt: time.Now(),
 		Program:   i.Program,
+		AutoYes:   i.AutoYes,
 	}
 
 	// Only include worktree data if gitWorktree is initialized
@@ -110,6 +113,7 @@ func FromInstanceData(data InstanceData) (*Instance, error) {
 		Width:     data.Width,
 		CreatedAt: data.CreatedAt,
 		UpdatedAt: data.UpdatedAt,
+		AutoYes:   data.AutoYes,
 		Program:   data.Program,
 		gitWorktree: git.NewGitWorktreeFromStorage(
 			data.Worktree.RepoPath,
@@ -165,6 +169,7 @@ func NewInstance(opts InstanceOptions) (*Instance, error) {
 		Width:     0,
 		CreatedAt: t,
 		UpdatedAt: t,
+		AutoYes:   false,
 	}, nil
 }
 
@@ -296,11 +301,23 @@ func (i *Instance) Preview() (string, error) {
 	return i.tmuxSession.CapturePaneContent()
 }
 
-func (i *Instance) HasUpdated() bool {
+func (i *Instance) HasUpdated() (updated bool, hasPrompt bool) {
 	if !i.started {
-		return false
+		return false, false
 	}
 	return i.tmuxSession.HasUpdated()
+}
+
+// TapEnter sends an enter key press to the tmux session if AutoYes is enabled.
+func (i *Instance) TapEnter() {
+	if !i.started || !i.AutoYes {
+		return
+	}
+	i.tmuxSession.TapEnter()
+}
+
+func (i *Instance) ToggleAutoYes() {
+	i.AutoYes = !i.AutoYes
 }
 
 func (i *Instance) Attach() (chan struct{}, error) {
