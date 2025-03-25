@@ -102,6 +102,7 @@ func (m *Menu) updateOptions() {
 		} else {
 			actionGroup = append(actionGroup, keys.KeyPause)
 		}
+		actionGroup = append(actionGroup, keys.KeyAutoYes)
 
 		// Navigation group (when in diff tab)
 		if m.isInDiffTab {
@@ -134,8 +135,8 @@ func (m *Menu) String() string {
 		end   int
 	}{
 		{0, 2}, // Instance management group (n, d)
-		{2, 5}, // Action group (enter, submit, pause/resume)
-		{5, 7}, // System group (tab, q)
+		{2, 6}, // Action group (enter, submit, pause/resume, autoyes)
+		{6, 8}, // System group (tab, q)
 	}
 
 	for i, k := range m.options {

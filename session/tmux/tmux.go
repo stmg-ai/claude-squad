@@ -118,10 +118,7 @@ func (t *TmuxSession) Start(program string, workDir string) error {
 			log.Printf("could not check 'do you trust the files screen': %v", err)
 		}
 		if strings.Contains(content, "Do you trust") {
-			_, err := t.ptmx.Write([]byte{0x0D})
-			if err != nil {
-				log.Printf("could not send enter keystroke to PTY: %v", err)
-			}
+			t.TapEnter()
 			break
 		}
 	}
@@ -157,19 +154,30 @@ func (m *statusMonitor) hash(s string) []byte {
 	return h.Sum(nil)
 }
 
-// HasUpdated checks if the tmux pane content has changed since the last tick.
-func (t *TmuxSession) HasUpdated() bool {
+// TapEnter sends an enter keystroke to the tmux pane.
+func (t *TmuxSession) TapEnter() {
+	_, err := t.ptmx.Write([]byte{0x0D})
+	if err != nil {
+		log.Printf("could not send enter keystroke to PTY: %v", err)
+	}
+}
+
+// HasUpdated checks if the tmux pane content has changed since the last tick. It also returns true if
+// the tmux pane has a prompt ("Do you want to ...").
+func (t *TmuxSession) HasUpdated() (updated bool, hasPrompt bool) {
 	content, err := t.CapturePaneContent()
 	if err != nil {
 		log.Printf("error capturing pane content in status monitor: %v", err)
-		return false
+		return false, false
 	}
+
+	hasPrompt = strings.Contains(content, "Do you want")
 
 	if !bytes.Equal(t.monitor.hash(content), t.monitor.prevOutputHash) {
 		t.monitor.prevOutputHash = t.monitor.hash(content)
-		return true
+		return true, hasPrompt
 	}
-	return false
+	return false, hasPrompt
 }
 
 func (t *TmuxSession) Attach() (chan struct{}, error) {

@@ -26,6 +26,9 @@ const (
 	// Diff keybindings
 	KeyShiftUp
 	KeyShiftDown
+
+	// AutoYes makes the claude instance tap Yes when prompted.
+	KeyAutoYes
 )
 
 // GlobalKeyStringsMap is a global, immutable map string to keybinding.
@@ -45,6 +48,7 @@ var GlobalKeyStringsMap = map[string]KeyName{
 	"p":          KeyPause,
 	"r":          KeyResume,
 	"s":          KeySubmit,
+	"y":          KeyAutoYes,
 }
 
 // GlobalkeyBindings is a global, immutable map of KeyName tot keybinding.
@@ -96,6 +100,10 @@ var GlobalkeyBindings = map[KeyName]key.Binding{
 	KeyResume: key.NewBinding(
 		key.WithKeys("r"),
 		key.WithHelp("r", "resume"),
+	),
+	KeyAutoYes: key.NewBinding(
+		key.WithKeys("y"),
+		key.WithHelp("y", "auto yes"),
 	),
 
 	// -- Special keybindings --

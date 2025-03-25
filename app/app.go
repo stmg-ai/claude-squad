@@ -151,10 +151,15 @@ func (m *home) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if !instance.Started() || instance.Paused() {
 				continue
 			}
-			if instance.HasUpdated() {
+			updated, prompt := instance.HasUpdated()
+			if updated {
 				instance.SetStatus(session.Running)
 			} else {
-				instance.SetStatus(session.Ready)
+				if prompt {
+					instance.TapEnter()
+				} else {
+					instance.SetStatus(session.Ready)
+				}
 			}
 			if err := instance.UpdateDiffStats(); err != nil {
 				log.Printf("could not update diff stats: %v", err)
@@ -289,6 +294,10 @@ func (m *home) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Then kill the instance
 		m.list.Kill()
 		return m, tea.WindowSize()
+	case keys.KeyAutoYes:
+		selected := m.list.GetSelectedInstance()
+		selected.ToggleAutoYes()
+		return m, nil
 	case keys.KeyNew:
 		if m.list.NumInstances() >= GlobalInstanceLimit {
 			return m.showErrorMessageForShortTime(

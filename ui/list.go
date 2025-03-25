@@ -132,9 +132,17 @@ func (r *InstanceRenderer) Render(i *session.Instance, idx int, selected bool, h
 	default:
 	}
 
+	titleText := i.Title
+	if i.AutoYes {
+		titleText += " (yolo)"
+	}
+	widthAvail := r.width - 3 - len(prefix) - 1
+	if widthAvail > 0 && widthAvail < len(titleText) && len(titleText) >= widthAvail-3 {
+		titleText = titleText[:widthAvail-3] + "..."
+	}
 	title := titleS.Render(lipgloss.JoinHorizontal(
 		lipgloss.Left,
-		lipgloss.Place(r.width-3, 1, lipgloss.Left, lipgloss.Center, fmt.Sprintf("%s %s", prefix, i.Title)),
+		lipgloss.Place(r.width-3, 1, lipgloss.Left, lipgloss.Center, fmt.Sprintf("%s %s", prefix, titleText)),
 		" ",
 		join,
 	))
