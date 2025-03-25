@@ -142,6 +142,13 @@ func NewInstance(opts InstanceOptions) (*Instance, error) {
 	}, nil
 }
 
+func (i *Instance) RepoName() (string, error) {
+	if !i.started {
+		return "", fmt.Errorf("cannot get repo name for instance that has not been started")
+	}
+	return i.gitWorktree.GetRepoName(), nil
+}
+
 func (i *Instance) SetStatus(status Status) {
 	i.Status = status
 }

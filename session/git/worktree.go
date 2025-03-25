@@ -3,6 +3,7 @@ package git
 import (
 	"claude-squad/config"
 	"fmt"
+	"log"
 	"path/filepath"
 	"time"
 )
@@ -45,6 +46,7 @@ func NewGitWorktree(repoPath string, sessionName string) (tree *GitWorktree, bra
 	// Convert repoPath to absolute path
 	absPath, err := filepath.Abs(repoPath)
 	if err != nil {
+		log.Printf("git worktree path abs error, falling back to repoPath %s: %s", repoPath, err)
 		// If we can't get absolute path, use original path as fallback
 		absPath = repoPath
 	}
@@ -78,4 +80,9 @@ func (g *GitWorktree) GetBranchName() string {
 // GetRepoPath returns the path to the repository
 func (g *GitWorktree) GetRepoPath() string {
 	return g.repoPath
+}
+
+// GetRepoName returns the name of the repository (last part of the repoPath).
+func (g *GitWorktree) GetRepoName() string {
+	return filepath.Base(g.repoPath)
 }
