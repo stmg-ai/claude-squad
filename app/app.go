@@ -2,11 +2,11 @@ package app
 
 import (
 	"claude-squad/keys"
+	"claude-squad/log"
 	"claude-squad/session"
 	"claude-squad/ui"
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"time"
 
@@ -118,7 +118,7 @@ func (m *home) updateHandleWindowSizeEvent(msg tea.WindowSizeMsg) {
 
 	previewWidth, previewHeight := m.tabbedWindow.GetPreviewSize()
 	if err := m.list.SetSessionPreviewSize(previewWidth, previewHeight); err != nil {
-		log.Println(err)
+		log.Error(err)
 	}
 	m.menu.SetSize(msg.Width, menuHeight)
 }
@@ -167,7 +167,7 @@ func (m *home) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 			if err := instance.UpdateDiffStats(); err != nil {
-				log.Printf("could not update diff stats: %v", err)
+				log.Warnf("could not update diff stats: %v", err)
 			}
 		}
 		return m, tickUpdateMetadataCmd

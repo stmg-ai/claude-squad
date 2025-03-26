@@ -3,7 +3,7 @@
 package tmux
 
 import (
-	"log"
+	"claude-squad/log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -23,10 +23,10 @@ func (t *TmuxSession) monitorWindowSize() {
 		// Use the current terminal height and width.
 		cols, rows, err := term.GetSize(int(os.Stdin.Fd()))
 		if err != nil {
-			log.Printf("failed to update window size: %v", err)
+			log.Errorf("failed to update window size: %v", err)
 		} else {
 			if err := t.updateWindowSize(cols, rows); err != nil {
-				log.Printf("failed to update window size: %v", err)
+				log.Errorf("failed to update window size: %v", err)
 			}
 		}
 	}
