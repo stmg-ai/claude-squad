@@ -21,12 +21,15 @@ func GetConfigDir() (string, error) {
 type Config struct {
 	// DefaultProgram is the default program to run in new instances
 	DefaultProgram string `json:"default_program"`
+	// AutoYes
+	AutoYes bool `json:"auto_yes"`
 }
 
 // DefaultConfig returns the default configuration
 func DefaultConfig() *Config {
 	return &Config{
 		DefaultProgram: "claude",
+		AutoYes:        false,
 	}
 }
 

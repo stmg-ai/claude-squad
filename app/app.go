@@ -18,8 +18,8 @@ import (
 const GlobalInstanceLimit = 10
 
 // Run is the main entrypoint into the application.
-func Run(ctx context.Context, program string) {
-	p := tea.NewProgram(newHome(ctx, program), tea.WithAltScreen())
+func Run(ctx context.Context, program string, autoYes bool) {
+	p := tea.NewProgram(newHome(ctx, program, autoYes), tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -38,6 +38,7 @@ type home struct {
 	ctx context.Context
 
 	program string
+	autoYes bool
 
 	// ui components
 	list         *ui.List
@@ -57,7 +58,7 @@ type home struct {
 	newInstanceFinalizer func()
 }
 
-func newHome(ctx context.Context, program string) *home {
+func newHome(ctx context.Context, program string, autoYes bool) *home {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
@@ -77,9 +78,10 @@ func newHome(ctx context.Context, program string) *home {
 		errBox:       ui.NewErrBox(),
 		storage:      storage,
 		program:      program,
+		autoYes:      autoYes,
 		state:        stateDefault,
 	}
-	h.list = ui.NewList(&h.spinner)
+	h.list = ui.NewList(&h.spinner, autoYes)
 
 	// Load saved instances
 	instances, err := storage.LoadInstances()
@@ -92,6 +94,9 @@ func newHome(ctx context.Context, program string) *home {
 	for _, instance := range instances {
 		// Call the finalizer immediately.
 		h.list.AddInstance(instance)()
+		if autoYes {
+			instance.AutoYes = true
+		}
 	}
 
 	return h
@@ -215,6 +220,9 @@ func (m *home) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			// Instance added successfully, call the finalizer.
 			m.newInstanceFinalizer()
+			if m.autoYes {
+				instance.AutoYes = true
+			}
 			return m, tea.WindowSize()
 		case tea.KeyRunes:
 			if len(instance.Title) >= 20 {
@@ -294,10 +302,6 @@ func (m *home) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Then kill the instance
 		m.list.Kill()
 		return m, tea.WindowSize()
-	case keys.KeyAutoYes:
-		selected := m.list.GetSelectedInstance()
-		selected.ToggleAutoYes()
-		return m, nil
 	case keys.KeyNew:
 		if m.list.NumInstances() >= GlobalInstanceLimit {
 			return m.showErrorMessageForShortTime(

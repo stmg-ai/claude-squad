@@ -46,25 +46,29 @@ var selectedDescStyle = lipgloss.NewStyle().
 
 var mainTitle = lipgloss.NewStyle().
 	Background(lipgloss.Color("62")).
-	Foreground(lipgloss.Color("230")).
-	MarginTop(1)
+	Foreground(lipgloss.Color("230"))
+
+var autoYes = lipgloss.NewStyle().
+	Foreground(lipgloss.AdaptiveColor{Light: "#1a1a1a", Dark: "#dddddd"})
 
 type List struct {
 	items         []*session.Instance
 	selectedIdx   int
 	height, width int
 	renderer      *InstanceRenderer
+	autoyes       bool
 
 	// map of repo name to number of instances using it. Used to display the repo name only if there are
 	// multiple repos in play.
 	repos map[string]int
 }
 
-func NewList(spinner *spinner.Model) *List {
+func NewList(spinner *spinner.Model, autoYes bool) *List {
 	return &List{
 		items:    []*session.Instance{},
 		renderer: &InstanceRenderer{spinner: spinner},
 		repos:    make(map[string]int),
+		autoyes:  autoYes,
 	}
 }
 
@@ -132,10 +136,8 @@ func (r *InstanceRenderer) Render(i *session.Instance, idx int, selected bool, h
 	default:
 	}
 
+	// Cut the title if it's too long
 	titleText := i.Title
-	if i.AutoYes {
-		titleText += " (yolo)"
-	}
 	widthAvail := r.width - 3 - len(prefix) - 1
 	if widthAvail > 0 && widthAvail < len(titleText) && len(titleText) >= widthAvail-3 {
 		titleText = titleText[:widthAvail-3] + "..."
@@ -221,10 +223,16 @@ func (r *InstanceRenderer) Render(i *session.Instance, idx int, selected bool, h
 
 func (l *List) String() string {
 	// Write the title.
+	titleItems := []string{
+		mainTitle.Render("  Instances  "),
+	}
+	if l.autoyes {
+		titleItems = append(titleItems, autoYes.Render("(auto-yes mode)"))
+	}
 	var b strings.Builder
 	b.WriteString("\n")
 	b.WriteString(lipgloss.Place(
-		l.width, 1, lipgloss.Left, lipgloss.Top, mainTitle.Render("  Instances  ")))
+		l.width, 2, lipgloss.Left, lipgloss.Bottom, strings.Join(titleItems, " ")))
 	b.WriteString("\n")
 	b.WriteString("\n")
 

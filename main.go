@@ -19,6 +19,7 @@ import (
 var (
 	resetFlag   bool
 	programFlag string
+	autoYesFlag bool
 	rootCmd     = &cobra.Command{
 		Use:   "claude-squad",
 		Short: "Claude Squad - A terminal-based session manager",
@@ -60,8 +61,13 @@ var (
 			if programFlag != "" {
 				program = programFlag
 			}
+			// AutoYes flag overrides config
+			autoYes := cfg.AutoYes
+			if autoYesFlag {
+				autoYes = true
+			}
 
-			app.Run(ctx, program)
+			app.Run(ctx, program, autoYes)
 			return nil
 		},
 	}
@@ -89,7 +95,10 @@ var (
 
 func init() {
 	rootCmd.Flags().BoolVar(&resetFlag, "reset", false, "Reset all stored instances")
-	rootCmd.Flags().StringVarP(&programFlag, "program", "p", "", "Program to run in new instances (e.g. 'aider --model ollama_chat/gemma3:1b')")
+	rootCmd.Flags().StringVarP(&programFlag, "program", "p", "",
+		"Program to run in new instances (e.g. 'aider --model ollama_chat/gemma3:1b')")
+	rootCmd.Flags().BoolVarP(&autoYesFlag, "autoyes", "y", false,
+		"[experimental] If enabled, all instances will automatically accept prompts")
 	rootCmd.AddCommand(debugCmd)
 }
 
