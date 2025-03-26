@@ -2,23 +2,23 @@
 
 > A terminal-based session manager for Claude Code and other CLI AI assistants
 
-Claude Squad is a TUI (terminal user interface) application that helps you manage multiple Claude Code sessions in separate tmux windows. It uses git worktrees to isolate each session, allowing you to work on different tasks simultaneously without conflicts.
+Claude Squad is a TUI (terminal user interface) application that helps you manage multiple Claude Code sessions in separate workspaces, allowing you to work on different tasks simultaneously without conflicts.
 
-![Claude Squad Screenshot](https://github.com/stmg-ai/claude-squad/raw/main/assets/screenshot.png)
+![Claude Squad Screenshot](assets/screenshot.png)
 
-## Features
+### Features
 
-- Create and manage multiple Claude Code sessions
-- Isolate each session using git worktrees
-- Preview session content in real-time
-- Pause/resume sessions with automatic commit of changes
-- Easy navigation between sessions
+- Manage multiple Claude Code sessions:
+  - Create and isolate sessions using git worktrees
+  - Preview session content in real-time
+  - Pause/resume sessions with automatic commit of changes
+- Navigate easily between sessions
 - Monitor session status (Running, Ready, Loading, Paused)
 - Support for various CLI AI tools (Claude Code, Aider, etc.)
 
-## Installation
+### Installation
 
-### One-Line Install
+The easiest way to install `claude-squad` is by running the following command:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/stmg-ai/claude-squad/main/install.sh | bash
@@ -26,12 +26,33 @@ curl -fsSL https://raw.githubusercontent.com/stmg-ai/claude-squad/main/install.s
 
 This will install the `claude-squad` binary to `~/.local/bin` and add it to your PATH.
 
+Alternatively, you can install `claude-squad` by building from source or installing a pre-built binary (see project repository for details).
+
 ### Prerequisites
 
 - [tmux](https://github.com/tmux/tmux/wiki/Installing)
 - [git](https://git-scm.com/downloads)
 
-## Usage
+<br />
+
+### Usage
+
+```
+Usage:
+  claude-squad [flags]
+  claude-squad [command]
+
+Available Commands:
+  completion  Generate the autocompletion script for the specified shell
+  debug       Print debug information like config paths
+  help        Help about any command
+
+Flags:
+  -y, --autoyes          [experimental] If enabled, all instances will automatically accept prompts
+  -h, --help             help for claude-squad
+  -p, --program string   Program to run in new instances (e.g. 'aider --model ollama_chat/gemma3:1b')
+      --reset            Reset all stored instances
+```
 
 Run the application with:
 
@@ -44,6 +65,8 @@ To use a specific AI assistant program:
 ```bash
 claude-squad -p "aider --model ollama_chat/gemma3:1b"
 ```
+
+<br />
 
 ### Menu Options
 
@@ -63,6 +86,8 @@ The menu at the bottom of the screen shows available commands:
 #### System
 - `tab` - Switch preview tab
 - `q` - Quit the application
+
+<br />
 
 ### Session States
 
