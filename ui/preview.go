@@ -116,7 +116,7 @@ func (p *PreviewPane) String() string {
 	}
 
 	// Calculate available height accounting for border and margin
-	availableHeight := p.height - 3 - 4 // 2 for borders, 1 for margin, 1 for ellipsis
+	availableHeight := p.height - 1 //  1 for ellipsis
 
 	lines := strings.Split(p.previewState.text, "\n")
 
