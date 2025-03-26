@@ -59,11 +59,11 @@ var GlobalkeyBindings = map[KeyName]key.Binding{
 	),
 	KeyShiftUp: key.NewBinding(
 		key.WithKeys("shift+up"),
-		key.WithHelp("shift+↑", "scroll up diff"),
+		key.WithHelp("shift+↑", "scroll up"),
 	),
 	KeyShiftDown: key.NewBinding(
 		key.WithKeys("shift+down"),
-		key.WithHelp("shift+↓", "scroll down diff"),
+		key.WithHelp("shift+↓", "scroll down"),
 	),
 	KeyEnter: key.NewBinding(
 		key.WithKeys("enter", "o"),
