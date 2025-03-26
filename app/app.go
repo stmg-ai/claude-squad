@@ -5,6 +5,7 @@ import (
 	"claude-squad/log"
 	"claude-squad/session"
 	"claude-squad/ui"
+	"claude-squad/ui/overlay"
 	"context"
 	"fmt"
 	"os"
@@ -30,6 +31,8 @@ const (
 	stateDefault state = iota
 	// stateNew is the state when the user is creating a new instance.
 	stateNew
+	// statePrompt is the state when the user is entering a prompt.
+	statePrompt
 )
 
 type home struct {
@@ -54,6 +57,12 @@ type home struct {
 	// newInstanceFinalizer is called when the state is stateNew and then you press enter.
 	// It registers the new instance in the list after the instance has been started.
 	newInstanceFinalizer func()
+
+	// promptAfterName tracks if we should enter prompt mode after naming
+	promptAfterName bool
+
+	// textInputOverlay is the component for handling text input with state
+	textInputOverlay *overlay.TextInputOverlay
 }
 
 func newHome(ctx context.Context, program string, autoYes bool) *home {
@@ -193,7 +202,10 @@ func (m *home) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.state == stateNew {
 		// Handle quit commands first. Don't handle q because the user might want to type that.
 		if msg.String() == "ctrl+c" {
-			return m.handleQuit()
+			m.state = stateDefault
+			m.promptAfterName = false
+			m.list.Kill()
+			return m, tea.WindowSize()
 		}
 
 		instance := m.list.GetInstances()[m.list.NumInstances()-1]
@@ -204,10 +216,6 @@ func (m *home) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m.showErrorMessageForShortTime(fmt.Errorf("title cannot be empty"))
 			}
 
-			defer func() {
-				m.state = stateDefault
-				m.menu.SetState(ui.StateDefault)
-			}()
 			if err := instance.Start(true); err != nil {
 				m.list.Kill()
 				return m.showErrorMessageForShortTime(err)
@@ -220,6 +228,18 @@ func (m *home) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.newInstanceFinalizer()
 			if m.autoYes {
 				instance.AutoYes = true
+			}
+
+			m.newInstanceFinalizer()
+			m.state = stateDefault
+			if m.promptAfterName {
+				m.state = statePrompt
+				m.menu.SetState(ui.StatePrompt)
+				// Initialize the text input overlay
+				m.textInputOverlay = overlay.NewTextInputOverlay("Enter prompt", "")
+				m.promptAfterName = false
+			} else {
+				m.menu.SetState(ui.StateDefault)
 			}
 			return m, tea.WindowSize()
 		case tea.KeyRunes:
@@ -253,6 +273,36 @@ func (m *home) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		default:
 		}
 		return m, nil
+	} else if m.state == statePrompt {
+		// Use the new TextInputOverlay component to handle all key events
+		shouldClose := m.textInputOverlay.HandleKeyPress(msg)
+
+		// Check if the form was submitted or canceled
+		if shouldClose {
+			if m.textInputOverlay.IsSubmitted() {
+				// Form was submitted, process the input
+				selected := m.list.GetSelectedInstance()
+				if selected == nil {
+					return m, nil
+				}
+				if err := selected.SendPrompt(m.textInputOverlay.GetValue()); err != nil {
+					return m.showErrorMessageForShortTime(err)
+				}
+			}
+
+			// Close the overlay and reset state
+			m.textInputOverlay = nil
+			m.state = stateDefault
+			return m, tea.Sequence(
+				tea.WindowSize(),
+				func() tea.Msg {
+					m.menu.SetState(ui.StateDefault)
+					return nil
+				},
+			)
+		}
+
+		return m, nil
 	}
 
 	// Handle quit commands first
@@ -266,6 +316,47 @@ func (m *home) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	switch name {
+	case keys.KeyPrompt:
+		if m.list.NumInstances() >= GlobalInstanceLimit {
+			return m.showErrorMessageForShortTime(
+				fmt.Errorf("you can't create more than %d instances", GlobalInstanceLimit))
+		}
+		instance, err := session.NewInstance(session.InstanceOptions{
+			Title:   "",
+			Path:    ".",
+			Program: m.program,
+		})
+		if err != nil {
+			return m.showErrorMessageForShortTime(err)
+		}
+
+		m.newInstanceFinalizer = m.list.AddInstance(instance)
+		m.list.SetSelectedInstance(m.list.NumInstances() - 1)
+		m.state = stateNew
+		m.menu.SetState(ui.StateNewInstance)
+		m.promptAfterName = true
+
+		return m, nil
+	case keys.KeyNew:
+		if m.list.NumInstances() >= GlobalInstanceLimit {
+			return m.showErrorMessageForShortTime(
+				fmt.Errorf("you can't create more than %d instances", GlobalInstanceLimit))
+		}
+		instance, err := session.NewInstance(session.InstanceOptions{
+			Title:   "",
+			Path:    ".",
+			Program: m.program,
+		})
+		if err != nil {
+			return m.showErrorMessageForShortTime(err)
+		}
+
+		m.newInstanceFinalizer = m.list.AddInstance(instance)
+		m.list.SetSelectedInstance(m.list.NumInstances() - 1)
+		m.state = stateNew
+		m.menu.SetState(ui.StateNewInstance)
+
+		return m, nil
 	case keys.KeyUp:
 		m.list.Up()
 		return m.updatePreview()
@@ -300,26 +391,6 @@ func (m *home) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Then kill the instance
 		m.list.Kill()
 		return m, tea.WindowSize()
-	case keys.KeyNew:
-		if m.list.NumInstances() >= GlobalInstanceLimit {
-			return m.showErrorMessageForShortTime(
-				fmt.Errorf("you can't create more than %d instances", GlobalInstanceLimit))
-		}
-		instance, err := session.NewInstance(session.InstanceOptions{
-			Title:   "",
-			Path:    ".",
-			Program: m.program,
-		})
-		if err != nil {
-			return m.showErrorMessageForShortTime(err)
-		}
-
-		m.newInstanceFinalizer = m.list.AddInstance(instance)
-		m.list.SetSelectedInstance(m.list.NumInstances() - 1)
-		m.state = stateNew
-		m.menu.SetState(ui.StateNewInstance)
-
-		return m, nil
 	case keys.KeySubmit:
 		selected := m.list.GetSelectedInstance()
 		if selected == nil {
@@ -424,10 +495,19 @@ func (m *home) View() string {
 	previewWithPadding := lipgloss.NewStyle().PaddingTop(1).Render(m.tabbedWindow.String())
 	listAndPreview := lipgloss.JoinHorizontal(lipgloss.Top, listWithPadding, previewWithPadding)
 
-	return lipgloss.JoinVertical(
+	mainView := lipgloss.JoinVertical(
 		lipgloss.Center,
 		listAndPreview,
 		m.menu.String(),
 		m.errBox.String(),
 	)
+
+	if m.state == statePrompt {
+		if m.textInputOverlay == nil {
+			log.ErrorLog.Printf("text input overlay is nil")
+		}
+		return overlay.PlaceOverlay(0, 0, m.textInputOverlay.Render(30, 120), mainView, true, true)
+	}
+
+	return mainView
 }

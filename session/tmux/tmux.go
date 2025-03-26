@@ -118,7 +118,11 @@ func (t *TmuxSession) Start(program string, workDir string) error {
 			log.ErrorLog.Printf("could not check 'do you trust the files screen': %v", err)
 		}
 		if strings.Contains(content, "Do you trust") {
-			t.TapEnter()
+			if err := t.TapEnter(); err != nil {
+				log.ErrorLog.Printf("could not tap enter on trust screen: %v", err)
+			}
+			// Wait a bit after tapping enter to ensure the trust screen is handled
+			time.Sleep(200 * time.Millisecond)
 			break
 		}
 	}
@@ -155,11 +159,17 @@ func (m *statusMonitor) hash(s string) []byte {
 }
 
 // TapEnter sends an enter keystroke to the tmux pane.
-func (t *TmuxSession) TapEnter() {
+func (t *TmuxSession) TapEnter() error {
 	_, err := t.ptmx.Write([]byte{0x0D})
 	if err != nil {
-		log.ErrorLog.Printf("could not send enter keystroke to PTY: %v", err)
+		return fmt.Errorf("error sending enter keystroke to PTY: %w", err)
 	}
+	return nil
+}
+
+func (t *TmuxSession) SendKeys(keys string) error {
+	_, err := t.ptmx.Write([]byte(keys))
+	return err
 }
 
 // HasUpdated checks if the tmux pane content has changed since the last tick. It also returns true if

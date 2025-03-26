@@ -22,6 +22,7 @@ const (
 
 	KeyPause
 	KeyResume
+	KeyPrompt // New key for entering a prompt
 
 	// Diff keybindings
 	KeyShiftUp
@@ -36,6 +37,7 @@ var GlobalKeyStringsMap = map[string]KeyName{
 	"j":          KeyDown,
 	"shift+up":   KeyShiftUp,
 	"shift+down": KeyShiftDown,
+	"N":          KeyPrompt,
 	"enter":      KeyEnter,
 	"o":          KeyEnter,
 	"n":          KeyNew,
@@ -84,6 +86,10 @@ var GlobalkeyBindings = map[KeyName]key.Binding{
 	KeySubmit: key.NewBinding(
 		key.WithKeys("s"),
 		key.WithHelp("s", "submit PR"),
+	),
+	KeyPrompt: key.NewBinding(
+		key.WithKeys("N"),
+		key.WithHelp("N", "new with prompt"),
 	),
 	KeyPause: key.NewBinding(
 		key.WithKeys("p"),

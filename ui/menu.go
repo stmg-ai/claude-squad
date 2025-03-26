@@ -38,6 +38,7 @@ type MenuState int
 const (
 	StateDefault MenuState = iota
 	StateNewInstance
+	StatePrompt
 )
 
 type Menu struct {
@@ -48,8 +49,9 @@ type Menu struct {
 	isInDiffTab   bool
 }
 
-var defaultMenuOptions = []keys.KeyName{keys.KeyNew, keys.KeyQuit}
+var defaultMenuOptions = []keys.KeyName{keys.KeyNew, keys.KeyPrompt, keys.KeyQuit}
 var newInstanceMenuOptions = []keys.KeyName{keys.KeySubmitName}
+var promptMenuOptions = []keys.KeyName{keys.KeyEnter}
 
 func NewMenu() *Menu {
 	return &Menu{
@@ -84,39 +86,43 @@ func (m *Menu) SetInDiffTab(inDiffTab bool) {
 // updateOptions updates the menu options based on current state and instance
 func (m *Menu) updateOptions() {
 	switch m.state {
+	case StateDefault:
+		m.options = defaultMenuOptions
+		if m.instance != nil {
+			m.addInstanceOptions()
+		}
 	case StateNewInstance:
 		m.options = newInstanceMenuOptions
-	case StateDefault:
-		if m.instance == nil {
-			m.options = defaultMenuOptions
-			return
-		}
-
-		// Instance management group
-		options := []keys.KeyName{keys.KeyNew, keys.KeyKill}
-
-		// Action group
-		actionGroup := []keys.KeyName{keys.KeyEnter, keys.KeySubmit}
-		if m.instance.Status == session.Paused {
-			actionGroup = append(actionGroup, keys.KeyResume)
-		} else {
-			actionGroup = append(actionGroup, keys.KeyPause)
-		}
-
-		// Navigation group (when in diff tab)
-		if m.isInDiffTab {
-			actionGroup = append(actionGroup, keys.KeyShiftUp, keys.KeyShiftDown)
-		}
-
-		// System group
-		systemGroup := []keys.KeyName{keys.KeyTab, keys.KeyQuit}
-
-		// Combine all groups
-		options = append(options, actionGroup...)
-		options = append(options, systemGroup...)
-
-		m.options = options
+	case StatePrompt:
+		m.options = promptMenuOptions
 	}
+}
+
+func (m *Menu) addInstanceOptions() {
+	// Instance management group
+	options := []keys.KeyName{keys.KeyNew, keys.KeyKill}
+
+	// Action group
+	actionGroup := []keys.KeyName{keys.KeyEnter, keys.KeySubmit}
+	if m.instance.Status == session.Paused {
+		actionGroup = append(actionGroup, keys.KeyResume)
+	} else {
+		actionGroup = append(actionGroup, keys.KeyPause)
+	}
+
+	// Navigation group (when in diff tab)
+	if m.isInDiffTab {
+		actionGroup = append(actionGroup, keys.KeyShiftUp, keys.KeyShiftDown)
+	}
+
+	// System group
+	systemGroup := []keys.KeyName{keys.KeyTab, keys.KeyQuit}
+
+	// Combine all groups
+	options = append(options, actionGroup...)
+	options = append(options, systemGroup...)
+
+	m.options = options
 }
 
 // SetSize sets the width of the window. The menu will be centered horizontally within this width.
