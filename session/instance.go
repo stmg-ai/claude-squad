@@ -76,7 +76,6 @@ func (i *Instance) ToInstanceData() InstanceData {
 		CreatedAt: i.CreatedAt,
 		UpdatedAt: time.Now(),
 		Program:   i.Program,
-		AutoYes:   i.AutoYes,
 	}
 
 	// Only include worktree data if gitWorktree is initialized
@@ -113,7 +112,6 @@ func FromInstanceData(data InstanceData) (*Instance, error) {
 		Width:     data.Width,
 		CreatedAt: data.CreatedAt,
 		UpdatedAt: data.UpdatedAt,
-		AutoYes:   data.AutoYes,
 		Program:   data.Program,
 		gitWorktree: git.NewGitWorktreeFromStorage(
 			data.Worktree.RepoPath,
@@ -149,6 +147,8 @@ type InstanceOptions struct {
 	Path string
 	// Program is the program to run in the instance (e.g. "claude", "aider --model ollama_chat/gemma3:1b")
 	Program string
+	// If AutoYes is true, then
+	AutoYes bool
 }
 
 func NewInstance(opts InstanceOptions) (*Instance, error) {
@@ -314,10 +314,6 @@ func (i *Instance) TapEnter() {
 		return
 	}
 	i.tmuxSession.TapEnter()
-}
-
-func (i *Instance) ToggleAutoYes() {
-	i.AutoYes = !i.AutoYes
 }
 
 func (i *Instance) Attach() (chan struct{}, error) {

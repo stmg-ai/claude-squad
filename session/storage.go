@@ -35,7 +35,6 @@ type InstanceData struct {
 	Width     int
 	CreatedAt time.Time
 	UpdatedAt time.Time
-	AutoYes   bool
 
 	Program   string
 	Worktree  GitWorktreeData
