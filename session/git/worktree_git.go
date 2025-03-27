@@ -35,13 +35,13 @@ func (g *GitWorktree) PushChanges(commitMessage string) error {
 	if isDirty {
 		// Stage all changes
 		if _, err := g.runGitCommand(g.worktreePath, "add", "."); err != nil {
-			log.Error(err)
+			log.ErrorLog.Print(err)
 			return fmt.Errorf("failed to stage changes: %w", err)
 		}
 
 		// Create commit
 		if _, err := g.runGitCommand(g.worktreePath, "commit", "-m", commitMessage); err != nil {
-			log.Error(err)
+			log.ErrorLog.Print(err)
 			return fmt.Errorf("failed to commit changes: %w", err)
 		}
 	}
@@ -54,7 +54,7 @@ func (g *GitWorktree) PushChanges(commitMessage string) error {
 		gitPushCmd := exec.Command("git", "push", "-u", "origin", g.branchName)
 		gitPushCmd.Dir = g.worktreePath
 		if pushOutput, pushErr := gitPushCmd.CombinedOutput(); pushErr != nil {
-			log.Error(pushErr)
+			log.ErrorLog.Print(pushErr)
 			return fmt.Errorf("failed to push branch: %s (%w)", pushOutput, pushErr)
 		}
 	}
@@ -63,7 +63,7 @@ func (g *GitWorktree) PushChanges(commitMessage string) error {
 	syncCmd := exec.Command("gh", "repo", "sync", "-b", g.branchName)
 	syncCmd.Dir = g.worktreePath
 	if output, err := syncCmd.CombinedOutput(); err != nil {
-		log.Error(err)
+		log.ErrorLog.Print(err)
 		return fmt.Errorf("failed to sync changes: %s (%w)", output, err)
 	}
 

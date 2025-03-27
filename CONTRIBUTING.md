@@ -1,0 +1,6 @@
+# Development
+
+### Lint
+```
+gofmt -d .
+```

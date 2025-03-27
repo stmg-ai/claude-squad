@@ -185,7 +185,7 @@ func (r *InstanceRenderer) Render(i *session.Instance, idx int, selected bool, h
 	if i.Started() && hasMultipleRepos {
 		repoName, err := i.RepoName()
 		if err != nil {
-			log.Errorf("could not get repo name in instance renderer: %v", err)
+			log.ErrorLog.Printf("could not get repo name in instance renderer: %v", err)
 		} else {
 			branch += fmt.Sprintf(" (%s)", repoName)
 		}
@@ -265,7 +265,7 @@ func (l *List) Kill() {
 
 	// Kill the tmux session
 	if err := targetInstance.Kill(); err != nil {
-		log.Errorf("could not kill instance: %v", err)
+		log.ErrorLog.Printf("could not kill instance: %v", err)
 	}
 
 	// If you delete the last one in the list, select the previous one.
@@ -276,7 +276,7 @@ func (l *List) Kill() {
 	// Unregister the reponame.
 	repoName, err := targetInstance.RepoName()
 	if err != nil {
-		log.Errorf("could not get repo name: %v", err)
+		log.ErrorLog.Printf("could not get repo name: %v", err)
 	} else {
 		l.rmRepo(repoName)
 	}
@@ -309,7 +309,7 @@ func (l *List) addRepo(repo string) {
 
 func (l *List) rmRepo(repo string) {
 	if _, ok := l.repos[repo]; !ok {
-		log.Errorf("repo %s not found", repo)
+		log.ErrorLog.Printf("repo %s not found", repo)
 		return
 	}
 	l.repos[repo]--
@@ -327,7 +327,7 @@ func (l *List) AddInstance(instance *session.Instance) (finalize func()) {
 	return func() {
 		repoName, err := instance.RepoName()
 		if err != nil {
-			log.Errorf("could not get repo name: %v", err)
+			log.ErrorLog.Printf("could not get repo name: %v", err)
 			return
 		}
 

@@ -199,7 +199,7 @@ func CleanupWorktrees() error {
 					deleteCmd := exec.Command("git", "branch", "-D", branch)
 					if err := deleteCmd.Run(); err != nil {
 						// Log the error but continue with other worktrees
-						log.Errorf("failed to delete branch %s: %v", branch, err)
+						log.ErrorLog.Printf("failed to delete branch %s: %v", branch, err)
 					}
 					break
 				}
