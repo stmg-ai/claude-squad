@@ -13,6 +13,7 @@ var (
 	ErrorLog   *log.Logger
 )
 
+// logFileName specifies the path to the log file in the system's temporary directory
 var logFileName = filepath.Join(os.TempDir(), "claudesquad.log")
 
 var globalLogFile *os.File
