@@ -115,7 +115,7 @@ func (t *TmuxSession) Start(program string, workDir string) error {
 		time.Sleep(100 * time.Millisecond)
 		content, err := t.CapturePaneContent()
 		if err != nil {
-			log.Errorf("could not check 'do you trust the files screen': %v", err)
+			log.ErrorLog.Printf("could not check 'do you trust the files screen': %v", err)
 		}
 		if strings.Contains(content, "Do you trust") {
 			t.TapEnter()
@@ -158,7 +158,7 @@ func (m *statusMonitor) hash(s string) []byte {
 func (t *TmuxSession) TapEnter() {
 	_, err := t.ptmx.Write([]byte{0x0D})
 	if err != nil {
-		log.Errorf("could not send enter keystroke to PTY: %v", err)
+		log.ErrorLog.Printf("could not send enter keystroke to PTY: %v", err)
 	}
 }
 
@@ -167,7 +167,7 @@ func (t *TmuxSession) TapEnter() {
 func (t *TmuxSession) HasUpdated() (updated bool, hasPrompt bool) {
 	content, err := t.CapturePaneContent()
 	if err != nil {
-		log.Errorf("error capturing pane content in status monitor: %v", err)
+		log.ErrorLog.Printf("error capturing pane content in status monitor: %v", err)
 		return false, false
 	}
 
@@ -231,7 +231,7 @@ func (t *TmuxSession) Attach() (chan struct{}, error) {
 			select {
 			case <-timeoutCh:
 			default:
-				log.Errorf("nuked first stdin: %s", buf[:nr])
+				log.ErrorLog.Printf("nuked first stdin: %s", buf[:nr])
 				continue
 			}
 
@@ -239,7 +239,7 @@ func (t *TmuxSession) Attach() (chan struct{}, error) {
 			if nr == 1 && buf[0] == 17 {
 				// Detach from the session
 				if err := t.Detach(); err != nil {
-					log.Errorf("Error detaching from tmux session: %v", err)
+					log.ErrorLog.Printf("Error detaching from tmux session: %v", err)
 				}
 				return
 			}

@@ -3,6 +3,7 @@ package main
 import (
 	"claude-squad/app"
 	"claude-squad/config"
+	"claude-squad/daemon"
 	"claude-squad/log"
 	"claude-squad/session"
 	"claude-squad/session/git"
@@ -19,13 +20,19 @@ var (
 	resetFlag   bool
 	programFlag string
 	autoYesFlag bool
+	daemonFlag  bool
 	rootCmd     = &cobra.Command{
 		Use:   "claude-squad",
 		Short: "Claude Squad - A terminal-based session manager",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()
-			log.Initialize()
+			log.Initialize(daemonFlag)
 			defer log.Close()
+
+			if daemonFlag {
+				err := daemon.RunDaemon()
+				return err
+			}
 
 			cfg, err := config.LoadConfig()
 			if err != nil {
@@ -52,6 +59,12 @@ var (
 				}
 				fmt.Println("Worktrees have been cleaned up")
 
+				// Kill any daemon that's running.
+				if err := daemon.StopDaemon(); err != nil {
+					log.ErrorLog.Printf("failed to stop daemon: %v", err)
+				}
+				fmt.Println("Daemon has been stopped")
+
 				return nil
 			}
 
@@ -65,9 +78,19 @@ var (
 			if autoYesFlag {
 				autoYes = true
 			}
+			if autoYes {
+				defer func() {
+					if err := daemon.LaunchDaemon(); err != nil {
+						log.ErrorLog.Printf("failed to launch daemon: %v", err)
+					}
+				}()
+			}
+			// Kill any daemon that's running.
+			if err := daemon.StopDaemon(); err != nil {
+				log.ErrorLog.Printf("failed to stop daemon: %v", err)
+			}
 
-			app.Run(ctx, program, autoYes)
-			return nil
+			return app.Run(ctx, program, autoYes)
 		},
 	}
 
@@ -98,11 +121,19 @@ func init() {
 		"Program to run in new instances (e.g. 'aider --model ollama_chat/gemma3:1b')")
 	rootCmd.Flags().BoolVarP(&autoYesFlag, "autoyes", "y", false,
 		"[experimental] If enabled, all instances will automatically accept prompts")
+	rootCmd.Flags().BoolVar(&daemonFlag, "daemon", false, "Run a program that loads all sessions"+
+		" and runs autoyes mode on them.")
+	// Hide the daemonFlag as it's only for internal use
+	err := rootCmd.Flags().MarkHidden("daemon")
+	if err != nil {
+		panic(err)
+	}
+
 	rootCmd.AddCommand(debugCmd)
 }
 
 func main() {
 	if err := rootCmd.Execute(); err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
 	}
 }

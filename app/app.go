@@ -18,12 +18,10 @@ import (
 const GlobalInstanceLimit = 10
 
 // Run is the main entrypoint into the application.
-func Run(ctx context.Context, program string, autoYes bool) {
+func Run(ctx context.Context, program string, autoYes bool) error {
 	p := tea.NewProgram(newHome(ctx, program, autoYes), tea.WithAltScreen())
-	if _, err := p.Run(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
+	_, err := p.Run()
+	return err
 }
 
 type state int
@@ -118,7 +116,7 @@ func (m *home) updateHandleWindowSizeEvent(msg tea.WindowSizeMsg) {
 
 	previewWidth, previewHeight := m.tabbedWindow.GetPreviewSize()
 	if err := m.list.SetSessionPreviewSize(previewWidth, previewHeight); err != nil {
-		log.Error(err)
+		log.ErrorLog.Print(err)
 	}
 	m.menu.SetSize(msg.Width, menuHeight)
 }
@@ -167,7 +165,7 @@ func (m *home) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 			if err := instance.UpdateDiffStats(); err != nil {
-				log.Warnf("could not update diff stats: %v", err)
+				log.WarningLog.Printf("could not update diff stats: %v", err)
 			}
 		}
 		return m, tickUpdateMetadataCmd
