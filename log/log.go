@@ -13,30 +13,37 @@ var (
 	ErrorLog   *log.Logger
 )
 
+// Errorf logs a formatted error message
 func Errorf(format string, v ...interface{}) {
 	ErrorLog.Printf(format, v...)
 }
 
+// Error logs error messages
 func Error(v ...any) {
 	ErrorLog.Println(v...)
 }
 
+// Infof logs a formatted informational message
 func Infof(format string, v ...interface{}) {
 	InfoLog.Printf(format, v...)
 }
 
+// Info logs informational messages
 func Info(v ...any) {
 	InfoLog.Println(v...)
 }
 
+// Warnf logs a formatted warning message
 func Warnf(format string, v ...interface{}) {
 	WarningLog.Printf(format, v...)
 }
 
+// Warn logs warning messages
 func Warn(v ...any) {
 	WarningLog.Println(v...)
 }
 
+// Fatal logs an error message and terminates the program
 func Fatal(v ...any) {
 	ErrorLog.Fatal(v...)
 }
@@ -64,6 +71,7 @@ func Initialize() {
 	globalLogFile = f
 }
 
+// Close flushes and closes the log file
 func Close() {
 	_ = globalLogFile.Close()
 	// TODO: maybe only print if verbose flag is set?
