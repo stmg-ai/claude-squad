@@ -19,6 +19,10 @@ import (
 	"golang.org/x/term"
 )
 
+const ProgramClaude = "claude"
+
+const ProgramAider = "aider"
+
 // TmuxSession represents a managed tmux session
 type TmuxSession struct {
 	// Initialized by NewTmuxSession
@@ -110,23 +114,30 @@ func (t *TmuxSession) Start(program string, workDir string) error {
 		return fmt.Errorf("error restoring tmux session: %w", err)
 	}
 
-	// Deal with "do you trust the files" screen by sending an enter keystroke. Try 5 times.
-	for i := 0; i < 5; i++ {
-		time.Sleep(100 * time.Millisecond)
-		content, err := t.CapturePaneContent()
-		if err != nil {
-			log.ErrorLog.Printf("could not check 'do you trust the files screen': %v", err)
+	if program == ProgramClaude || strings.Contains(program, ProgramAider) {
+		searchString := "Do you trust the files in this folder?"
+		tapFunc := t.TapEnter
+		iterations := 5
+		if program != ProgramClaude {
+			searchString = "Open documentation url for more info"
+			tapFunc = t.TapDAndEnter
+			iterations = 10 // Aider takes longer to start :/
 		}
-		if strings.Contains(content, "Do you trust") {
-			if err := t.TapEnter(); err != nil {
-				log.ErrorLog.Printf("could not tap enter on trust screen: %v", err)
-			}
-			// Wait a bit after tapping enter to ensure the trust screen is handled
+		// Deal with "do you trust the files" screen by sending an enter keystroke.
+		for i := 0; i < iterations; i++ {
 			time.Sleep(200 * time.Millisecond)
-			break
+			content, err := t.CapturePaneContent()
+			if err != nil {
+				log.ErrorLog.Printf("could not check 'do you trust the files screen': %v", err)
+			}
+			if strings.Contains(content, searchString) {
+				if err := tapFunc(); err != nil {
+					log.ErrorLog.Printf("could not tap enter on trust screen: %v", err)
+				}
+				break
+			}
 		}
 	}
-
 	return nil
 }
 
@@ -161,6 +172,15 @@ func (m *statusMonitor) hash(s string) []byte {
 // TapEnter sends an enter keystroke to the tmux pane.
 func (t *TmuxSession) TapEnter() error {
 	_, err := t.ptmx.Write([]byte{0x0D})
+	if err != nil {
+		return fmt.Errorf("error sending enter keystroke to PTY: %w", err)
+	}
+	return nil
+}
+
+// TapDAndEnter sends 'D' followed by an enter keystroke to the tmux pane.
+func (t *TmuxSession) TapDAndEnter() error {
+	_, err := t.ptmx.Write([]byte{0x44, 0x0D})
 	if err != nil {
 		return fmt.Errorf("error sending enter keystroke to PTY: %w", err)
 	}
