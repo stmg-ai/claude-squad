@@ -261,6 +261,7 @@ func (m *home) handleKeyPress(msg tea.KeyMsg) (mod tea.Model, cmd tea.Cmd) {
 
 			if err := instance.Start(true); err != nil {
 				m.list.Kill()
+				m.state = stateDefault
 				return m.showErrorMessageForShortTime(err)
 			}
 			// Save after adding new instance
