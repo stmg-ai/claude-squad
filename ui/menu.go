@@ -47,6 +47,9 @@ type Menu struct {
 	state         MenuState
 	instance      *session.Instance
 	isInDiffTab   bool
+
+	// keyDown is the key which is pressed. The default is -1.
+	keyDown keys.KeyName
 }
 
 var defaultMenuOptions = []keys.KeyName{keys.KeyNew, keys.KeyPrompt, keys.KeyQuit}
@@ -58,7 +61,16 @@ func NewMenu() *Menu {
 		options:     defaultMenuOptions,
 		state:       StateDefault,
 		isInDiffTab: false,
+		keyDown:     -1,
 	}
+}
+
+func (m *Menu) Keydown(name keys.KeyName) {
+	m.keyDown = name
+}
+
+func (m *Menu) ClearKeydown() {
+	m.keyDown = -1
 }
 
 // SetState updates the menu state and options accordingly
@@ -147,17 +159,28 @@ func (m *Menu) String() string {
 	for i, k := range m.options {
 		binding := keys.GlobalkeyBindings[k]
 
+		var (
+			localActionStyle = actionGroupStyle
+			localKeyStyle    = keyStyle
+			localDescStyle   = descStyle
+		)
+		if m.keyDown == k {
+			localActionStyle = localActionStyle.Underline(true)
+			localKeyStyle = localKeyStyle.Underline(true)
+			localDescStyle = localDescStyle.Underline(true)
+		}
+
 		// Check if we're in the action group (middle group)
 		inActionGroup := i >= groups[1].start && i < groups[1].end
 
 		if inActionGroup {
-			s.WriteString(actionGroupStyle.Render(binding.Help().Key))
+			s.WriteString(localActionStyle.Render(binding.Help().Key))
 			s.WriteString(" ")
-			s.WriteString(actionGroupStyle.Render(binding.Help().Desc))
+			s.WriteString(localActionStyle.Render(binding.Help().Desc))
 		} else {
-			s.WriteString(keyStyle.Render(binding.Help().Key))
+			s.WriteString(localKeyStyle.Render(binding.Help().Key))
 			s.WriteString(" ")
-			s.WriteString(descStyle.Render(binding.Help().Desc))
+			s.WriteString(localDescStyle.Render(binding.Help().Desc))
 		}
 
 		// Add appropriate separator
