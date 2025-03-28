@@ -11,8 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"errors"
-
 	"github.com/atotto/clipboard"
 )
 
@@ -51,6 +49,8 @@ type Instance struct {
 	UpdatedAt time.Time
 	// AutoYes is true if the instance should automatically press enter when prompted.
 	AutoYes bool
+	// Prompt is the initial prompt to pass to the instance on startup
+	Prompt string
 
 	// DiffStats stores the current git diff statistics
 	diffStats *git.DiffStats
@@ -76,6 +76,7 @@ func (i *Instance) ToInstanceData() InstanceData {
 		CreatedAt: i.CreatedAt,
 		UpdatedAt: time.Now(),
 		Program:   i.Program,
+		AutoYes:   i.AutoYes,
 	}
 
 	// Only include worktree data if gitWorktree is initialized
@@ -228,7 +229,7 @@ func (i *Instance) Start(firstTimeSetup bool) error {
 		}
 
 		// Create new session
-		if err := tmuxSession.Start(i.Program, i.gitWorktree.GetWorktreePath()); err != nil {
+		if err := i.tmuxSession.Start(i.Program, i.gitWorktree.GetWorktreePath()); err != nil {
 			// Cleanup git worktree if tmux session creation fails
 			if cleanupErr := i.gitWorktree.Cleanup(); cleanupErr != nil {
 				err = fmt.Errorf("%v (cleanup error: %v)", err, cleanupErr)
@@ -283,7 +284,7 @@ func (i *Instance) combineErrors(errs []error) error {
 	for _, err := range errs {
 		errMsg += "\n  - " + err.Error()
 	}
-	return errors.New(errMsg)
+	return fmt.Errorf("%s", errMsg)
 }
 
 // Close is an alias for Kill to maintain backward compatibility
@@ -313,7 +314,9 @@ func (i *Instance) TapEnter() {
 	if !i.started || !i.AutoYes {
 		return
 	}
-	i.tmuxSession.TapEnter()
+	if err := i.tmuxSession.TapEnter(); err != nil {
+		log.ErrorLog.Printf("error tapping enter: %v", err)
+	}
 }
 
 func (i *Instance) Attach() (chan struct{}, error) {
@@ -485,4 +488,25 @@ func (i *Instance) UpdateDiffStats() error {
 // GetDiffStats returns the current git diff statistics
 func (i *Instance) GetDiffStats() *git.DiffStats {
 	return i.diffStats
+}
+
+// SendPrompt sends a prompt to the tmux session
+func (i *Instance) SendPrompt(prompt string) error {
+	if !i.started {
+		return fmt.Errorf("instance not started")
+	}
+	if i.tmuxSession == nil {
+		return fmt.Errorf("tmux session not initialized")
+	}
+	if err := i.tmuxSession.SendKeys(prompt); err != nil {
+		return fmt.Errorf("error sending keys to tmux session: %w", err)
+	}
+
+	// Brief pause to prevent carriage return from being interpreted as newline
+	time.Sleep(100 * time.Millisecond)
+	if err := i.tmuxSession.TapEnter(); err != nil {
+		return fmt.Errorf("error tapping enter: %w", err)
+	}
+
+	return nil
 }
