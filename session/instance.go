@@ -460,6 +460,7 @@ func (i *Instance) Resume() error {
 }
 
 // UpdateDiffStats updates the git diff statistics for this instance
+// This is called periodically to keep the UI in sync with the git state
 func (i *Instance) UpdateDiffStats() error {
 	if !i.started {
 		i.diffStats = nil
@@ -491,6 +492,7 @@ func (i *Instance) GetDiffStats() *git.DiffStats {
 }
 
 // SendPrompt sends a prompt to the tmux session
+// Sends text to the Claude instance and presses Enter after a small delay
 func (i *Instance) SendPrompt(prompt string) error {
 	if !i.started {
 		return fmt.Errorf("instance not started")
