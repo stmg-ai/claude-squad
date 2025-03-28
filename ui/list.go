@@ -15,41 +15,41 @@ const readyIcon = "● "
 const pausedIcon = "⏸ "
 
 var readyStyle = lipgloss.NewStyle().
-	Foreground(lipgloss.AdaptiveColor{Light: "#51bd73", Dark: "#51bd73"})
+	Foreground(Green)
 
 var addedLinesStyle = lipgloss.NewStyle().
-	Foreground(lipgloss.AdaptiveColor{Light: "#51bd73", Dark: "#51bd73"})
+	Foreground(Green)
 
 var removedLinesStyle = lipgloss.NewStyle().
-	Foreground(lipgloss.Color("#de613e"))
+	Foreground(Red)
 
 var pausedStyle = lipgloss.NewStyle().
-	Foreground(lipgloss.AdaptiveColor{Light: "#888888", Dark: "#888888"})
+	Foreground(TextGray)
 
 var titleStyle = lipgloss.NewStyle().
 	Padding(1, 1, 0, 1).
-	Foreground(lipgloss.AdaptiveColor{Light: "#1a1a1a", Dark: "#dddddd"})
+	Foreground(TextPrimary)
 
 var listDescStyle = lipgloss.NewStyle().
 	Padding(0, 1, 1, 1).
-	Foreground(lipgloss.AdaptiveColor{Light: "#A49FA5", Dark: "#777777"})
+	Foreground(TextMuted)
 
 var selectedTitleStyle = lipgloss.NewStyle().
 	Padding(1, 1, 0, 1).
-	Background(lipgloss.Color("#dde4f0")).
-	Foreground(lipgloss.AdaptiveColor{Light: "#1a1a1a", Dark: "#1a1a1a"})
+	Background(BgSelection).
+	Foreground(TextPrimary)
 
 var selectedDescStyle = lipgloss.NewStyle().
 	Padding(0, 1, 1, 1).
-	Background(lipgloss.Color("#dde4f0")).
-	Foreground(lipgloss.AdaptiveColor{Light: "#1a1a1a", Dark: "#1a1a1a"})
+	Background(BgSelection).
+	Foreground(TextPrimary)
 
 var mainTitle = lipgloss.NewStyle().
-	Background(lipgloss.Color("62")).
-	Foreground(lipgloss.Color("230"))
+	Background(BgTitle).
+	Foreground(TitleText)
 
 var autoYes = lipgloss.NewStyle().
-	Foreground(lipgloss.AdaptiveColor{Light: "#1a1a1a", Dark: "#dddddd"})
+	Foreground(TextPrimary)
 
 type List struct {
 	items         []*session.Instance

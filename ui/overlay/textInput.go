@@ -109,10 +109,15 @@ func (t *TextInputOverlay) SetOnSubmit(onSubmit func()) {
 
 // Render renders the text input overlay
 func (t *TextInputOverlay) Render(height, width int, opts ...WhitespaceOption) string {
+	// Define colors
+	purple := lipgloss.Color("#7D56F4")
+	textGray := lipgloss.Color("#AAAAAA")
+	white := lipgloss.Color("#FFFFFF")
+
 	// Style the title
 	titleStyle := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("#7D56F4")).
+		Foreground(purple).
 		MarginBottom(1)
 
 	// Style the input value
@@ -130,19 +135,19 @@ func (t *TextInputOverlay) Render(height, width int, opts ...WhitespaceOption) s
 
 	// Highlight the focused element
 	if t.FocusIndex == 0 {
-		inputBoxStyle = inputBoxStyle.BorderForeground(lipgloss.Color("#7D56F4"))
-		enterButtonStyle = enterButtonStyle.BorderForeground(lipgloss.Color("#AAAAAA"))
+		inputBoxStyle = inputBoxStyle.BorderForeground(purple)
+		enterButtonStyle = enterButtonStyle.BorderForeground(textGray)
 	} else {
-		inputBoxStyle = inputBoxStyle.BorderForeground(lipgloss.Color("#AAAAAA"))
-		enterButtonStyle = enterButtonStyle.BorderForeground(lipgloss.Color("#7D56F4"))
+		inputBoxStyle = inputBoxStyle.BorderForeground(textGray)
+		enterButtonStyle = enterButtonStyle.BorderForeground(purple)
 	}
 
 	// Create a terminal-style cursor (block cursor)
 	cursor := ""
 	if t.FocusIndex == 0 {
 		cursor = lipgloss.NewStyle().
-			Background(lipgloss.Color("#7D56F4")).
-			Foreground(lipgloss.Color("#FFFFFF")).
+			Background(purple).
+			Foreground(white).
 			Render(" ")
 	}
 
