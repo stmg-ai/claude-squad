@@ -438,7 +438,7 @@ func (m *home) handleKeyPress(msg tea.KeyMsg) (mod tea.Model, cmd tea.Cmd) {
 		}
 
 		// Default commit message with timestamp
-		commitMsg := fmt.Sprintf("Update from session %s at %s", selected.Title, time.Now().Format(time.RFC3339))
+		commitMsg := fmt.Sprintf("[claudesquad] update from '%s' on %s", selected.Title, time.Now().Format(time.RFC822))
 		worktree, err := selected.GetGitWorktree()
 		if err != nil {
 			return m.showErrorMessageForShortTime(err)
