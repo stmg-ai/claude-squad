@@ -1,0 +1,29 @@
+builds:
+  - binary: claude-squad
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    env:
+      - CGO_ENABLED=0
+
+release:
+  prerelease: auto
+  draft: true
+  replace_existing_draft: true
+
+checksum:
+  name_template: 'checksums.txt'
+
+changelog:
+  use: github
+
+  filters:
+    exclude:
+      - "^docs:"
+      - typo
+      - "^refactor"
+      - "^chore"

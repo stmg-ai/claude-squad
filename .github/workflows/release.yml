@@ -7,94 +7,25 @@ on:
 
 jobs:
   build:
-    name: Build Release Binaries
+    permissions: write-all
+    name: Build Release
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        goos: [linux, darwin, windows]
-        goarch: [amd64, arm64]
-        exclude:
-          - goos: windows
-            goarch: arm64
 
     steps:
-    - uses: actions/checkout@v4
-
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: '1.23'
-        cache: true
-
-    - name: Run tests
-      run: go test -v ./...
-
-    - name: Build
-      env:
-        GOOS: ${{ matrix.goos }}
-        GOARCH: ${{ matrix.goarch }}
-      run: |
-        BINARY_NAME=claude-squad
-        if [ "${{ matrix.goos }}" = "windows" ]; then
-          BINARY_NAME=$BINARY_NAME.exe
-        fi
-        go build -v -o build/${{ matrix.goos }}_${{ matrix.goarch }}/$BINARY_NAME
-
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: claude-squad-${{ matrix.goos }}-${{ matrix.goarch }}
-        path: build/${{ matrix.goos }}_${{ matrix.goarch }}/*
-        retention-days: 7
-
-  release:
-    name: Create Release
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Generate Changelog
-        id: changelog
-        run: |
-          last_tag=$(git describe --tags --abbrev=0 2>/dev/null)
-          if [ -z "$last_tag" ]; then
-              echo "No tags found. Using all commits:"
-              changelog=$(git log --pretty=format:"%s" HEAD)
-          else
-              echo "Commits since last tag ($last_tag):"
-              changelog=$(git log --pretty=format:"%s" "$last_tag"..HEAD)
-          fi
-          cat << EOF >> $GITHUB_OUTPUT
-          changelog<<DELIMITER
-          $changelog
-          DELIMITER
-          EOF
-
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
+      - name: Set up Go 1.23
+        uses: actions/setup-go@v4
         with:
-          path: artifacts
+          go-version: '1.23'
 
-      - name: Create Release
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v5
+        with:
+          version: latest
+          args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Prepare binaries
-          cd artifacts
-          for dir in */; do
-            cd "$dir"
-            zip -r "../${dir%/}.zip" .
-            cd ..
-          done
-          
-          # Create release
-          gh release create ${{ github.ref_name }} \
-            --title "Release ${{ github.ref_name }}" \
-            --notes "${{ steps.changelog.outputs.changelog }}" \
-            --draft \
-            *.zip 
