@@ -21,7 +21,7 @@ func GetConfigDir() (string, error) {
 type Config struct {
 	// DefaultProgram is the default program to run in new instances
 	DefaultProgram string `json:"default_program"`
-	// AutoYes
+	// AutoYes determines whether to automatically confirm operations without prompting
 	AutoYes bool `json:"auto_yes"`
 }
 
@@ -62,7 +62,7 @@ func LoadConfig() (*Config, error) {
 	return &config, nil
 }
 
-// SaveConfig saves the configuration to disk
+// SaveConfig saves the configuration to disk and creates the config directory if it doesn't exist
 func SaveConfig(config *Config) error {
 	configDir, err := GetConfigDir()
 	if err != nil {
