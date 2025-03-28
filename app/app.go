@@ -67,6 +67,9 @@ type home struct {
 
 	// textInputOverlay is the component for handling text input with state
 	textInputOverlay *overlay.TextInputOverlay
+
+	// keySent is used to manage underlines
+	keySent bool
 }
 
 func newHome(ctx context.Context, program string, autoYes bool) *home {
@@ -162,6 +165,9 @@ func (m *home) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return previewTickMsg{}
 			},
 		)
+	case keyupMsg:
+		m.menu.ClearKeydown()
+		return m, nil
 	case tickUpdateMetadataMessage:
 		for _, instance := range m.list.GetInstances() {
 			if !instance.Started() || instance.Paused() {
@@ -217,7 +223,25 @@ func (m *home) handleQuit() (tea.Model, tea.Cmd) {
 	return m, tea.Quit
 }
 
-func (m *home) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m *home) handleKeyPress(msg tea.KeyMsg) (mod tea.Model, cmd tea.Cmd) {
+	// Handle menu highlighting when you press a button. We intercept it here and immediately return to
+	// update the ui while re-sending the keypress. Then, on the next call to this, we actually handle the keypress.
+	if !m.keySent && m.state != statePrompt {
+		m.keySent = true
+		// If it's in the global keymap, we should try to highlight it.
+		name, ok := keys.GlobalKeyStringsMap[msg.String()]
+		if !ok {
+			return m, func() tea.Msg { return msg }
+		}
+		// TODO: cleanup: when you press enter on stateNew, we use keys.KeySubmitName. We should unify the keymap.
+		if name == keys.KeyEnter && m.state == stateNew {
+			name = keys.KeySubmitName
+		}
+		return m, tea.Batch(
+			func() tea.Msg { return msg },
+			m.keydownCallback(name))
+	}
+	m.keySent = false
 	if m.state == stateNew {
 		// Handle quit commands first. Don't handle q because the user might want to type that.
 		if msg.String() == "ctrl+c" {
@@ -262,7 +286,7 @@ func (m *home) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			return m, tea.WindowSize()
 		case tea.KeyRunes:
-			if len(instance.Title) >= 20 {
+			if len(instance.Title) >= 32 {
 				return m.showErrorMessageForShortTime(fmt.Errorf("title cannot be longer than 32 characters"))
 			}
 			if err := instance.SetTitle(instance.Title + string(msg.Runes)); err != nil {
@@ -476,6 +500,21 @@ func (m *home) updatePreview() (tea.Model, tea.Cmd) {
 	// Update menu with current instance
 	m.menu.SetInstance(selected)
 	return m, nil
+}
+
+type keyupMsg struct{}
+
+// keydownCallback clears the menu option highlighting after 500ms.
+func (m *home) keydownCallback(name keys.KeyName) tea.Cmd {
+	m.menu.Keydown(name)
+	return func() tea.Msg {
+		select {
+		case <-m.ctx.Done():
+		case <-time.After(500 * time.Millisecond):
+		}
+
+		return keyupMsg{}
+	}
 }
 
 // hideErrMsg implements tea.Msg and clears the error text from the screen.
