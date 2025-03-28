@@ -73,10 +73,6 @@ type home struct {
 }
 
 func newHome(ctx context.Context, program string, autoYes bool) *home {
-	s := spinner.New()
-	s.Spinner = spinner.Dot
-	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
-
 	// Initialize storage
 	storage, err := session.NewStorage()
 	if err != nil {
