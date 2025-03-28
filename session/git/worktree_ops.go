@@ -210,5 +210,12 @@ func CleanupWorktrees() error {
 		}
 	}
 
+	// You have to prune the cleaned up worktrees.
+	cmd = exec.Command("git", "worktree", "prune")
+	_, err = cmd.Output()
+	if err != nil {
+		return fmt.Errorf("failed to prune worktrees: %w", err)
+	}
+
 	return nil
 }

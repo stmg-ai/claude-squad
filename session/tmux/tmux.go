@@ -54,15 +54,17 @@ type TmuxSession struct {
 	wg     *sync.WaitGroup
 }
 
-func removeWhitespace(str string) string {
+const TmuxPrefix = "claudesquad-"
+
+func toClaudeSquadTmuxName(str string) string {
 	re := regexp.MustCompile(`\s+`)
-	return re.ReplaceAllString(str, "")
+	return fmt.Sprintf("%s%s", TmuxPrefix, re.ReplaceAllString(str, ""))
 }
 
 func NewTmuxSession(name string) *TmuxSession {
 	return &TmuxSession{
 		Name:          name,
-		sanitizedName: removeWhitespace(name),
+		sanitizedName: toClaudeSquadTmuxName(name),
 	}
 }
 
@@ -365,7 +367,8 @@ func (t *TmuxSession) updateWindowSize(cols, rows int) error {
 
 // DoesSessionExist checks if a tmux session exists
 func DoesSessionExist(name string) bool {
-	existsCmd := exec.Command("tmux", "has-session", "-t", name)
+	// Using "-t name" does a prefix match, which is wrong. `-t=` does an exact match.
+	existsCmd := exec.Command("tmux", "has-session", fmt.Sprintf("-t=%s", name))
 	return existsCmd.Run() == nil
 }
 
@@ -407,7 +410,7 @@ func CleanupSessions() error {
 		return fmt.Errorf("failed to list tmux sessions: %v", err)
 	}
 
-	re := regexp.MustCompile(`^session-\d+`)
+	re := regexp.MustCompile(fmt.Sprintf(`^%s\d+`, TmuxPrefix))
 	matches := re.FindAllString(string(output), -1)
 
 	for _, match := range matches {
