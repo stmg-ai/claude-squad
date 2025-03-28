@@ -64,15 +64,12 @@ jobs:
           PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
           if [ -z "$PREVIOUS_TAG" ]; then
             # If no previous tag exists, get all commits
-            echo "changelog<<EOF" >> $GITHUB_OUTPUT
-            git log --pretty=format:"* %s" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
+            git log --pretty=format:"* %s" > changelog.txt
           else
             # Get commits since last tag
-            echo "changelog<<EOF" >> $GITHUB_OUTPUT
-            git log --pretty=format:"* %s" $PREVIOUS_TAG..HEAD >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
+            git log --pretty=format:"* %s" $PREVIOUS_TAG..HEAD > changelog.txt
           fi
+          echo "changelog=$(cat changelog.txt)" >> $GITHUB_OUTPUT
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
