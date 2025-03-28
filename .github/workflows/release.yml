@@ -61,15 +61,19 @@ jobs:
       - name: Generate Changelog
         id: changelog
         run: |
-          PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
-          if [ -z "$PREVIOUS_TAG" ]; then
-            # If no previous tag exists, get all commits
-            git log --pretty=format:"* %s" > changelog.txt
+          last_tag=$(git describe --tags --abbrev=0 2>/dev/null)
+          if [ -z "$last_tag" ]; then
+              echo "No tags found. Using all commits:"
+              changelog=$(git log --pretty=format:"%s" HEAD)
           else
-            # Get commits since last tag
-            git log --pretty=format:"* %s" $PREVIOUS_TAG..HEAD > changelog.txt
+              echo "Commits since last tag ($last_tag):"
+              changelog=$(git log --pretty=format:"%s" "$last_tag"..HEAD)
           fi
-          echo "changelog=$(cat changelog.txt)" >> $GITHUB_OUTPUT
+          cat << EOF >> $GITHUB_OUTPUT
+          changelog<<DELIMITER
+          $changelog
+          DELIMITER
+          EOF
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -92,4 +96,5 @@ jobs:
           gh release create ${{ github.ref_name }} \
             --title "Release ${{ github.ref_name }}" \
             --notes "${{ steps.changelog.outputs.changelog }}" \
+            --draft \
             *.zip 
