@@ -20,7 +20,11 @@ const GlobalInstanceLimit = 10
 
 // Run is the main entrypoint into the application.
 func Run(ctx context.Context, program string, autoYes bool) error {
-	p := tea.NewProgram(newHome(ctx, program, autoYes), tea.WithAltScreen())
+	p := tea.NewProgram(
+		newHome(ctx, program, autoYes),
+		tea.WithAltScreen(),
+		tea.WithMouseCellMotion(), // Mouse scroll
+	)
 	_, err := p.Run()
 	return err
 }
@@ -178,6 +182,21 @@ func (m *home) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		return m, tickUpdateMetadataCmd
+	case tea.MouseMsg:
+		// Handle mouse wheel scrolling in the diff view
+		if m.tabbedWindow.IsInDiffTab() {
+			if msg.Action == tea.MouseActionPress {
+				switch msg.Button {
+				case tea.MouseButtonWheelUp:
+					m.tabbedWindow.ScrollUp()
+					return m.updatePreview()
+				case tea.MouseButtonWheelDown:
+					m.tabbedWindow.ScrollDown()
+					return m.updatePreview()
+				}
+			}
+		}
+		return m, nil
 	case tea.KeyMsg:
 		return m.handleKeyPress(msg)
 	case tea.WindowSizeMsg:
