@@ -42,7 +42,7 @@ type InstanceData struct {
 	DiffStats DiffStatsData
 }
 
-// Storage handles saving and loading instances
+// Storage handles saving and loading instances to and from disk
 type Storage struct {
 	filePath  string
 	backupDir string
