@@ -1,20 +1,14 @@
 # Claude Squad
 
-> A terminal-based session manager for Claude Code and other CLI AI assistants
-
-Claude Squad is a TUI (terminal user interface) application that helps you manage multiple Claude Code sessions in separate workspaces, allowing you to work on different tasks simultaneously without conflicts.
+Claude Squad is terminal UI that manages multiple Claude Code (and other local agents including Aider) in separate workspaces, allowing you to work on different tasks simultaneously.
 
 ![Claude Squad Screenshot](assets/screenshot.png)
 
 ### Features
-
-- Manage multiple Claude Code sessions:
-  - Create and isolate sessions using git worktrees
-  - Preview session content in real-time
-  - Pause/resume sessions with automatic commit of changes
-- Navigate easily between sessions
-- Monitor session status (Running, Ready, Loading, Paused)
-- Support for various CLI AI tools (Claude Code, Aider, etc.)
+- Complete tasks in the background (including yolo / auto yes mode!)
+- Manage instances and tasksin one terminal window
+- Review changes before applying them, checkout change before pushing them
+- Each task gets its own git workspace, so no conflicts
 
 ### Installation
 
@@ -33,8 +27,6 @@ Alternatively, you can install `claude-squad` by building from source or install
 - [tmux](https://github.com/tmux/tmux/wiki/Installing)
 - [git](https://git-scm.com/downloads)
 
-<br />
-
 ### Usage
 
 ```
@@ -48,9 +40,9 @@ Available Commands:
   help        Help about any command
 
 Flags:
-  -y, --autoyes          [experimental] If enabled, all instances will automatically accept prompts
+  -y, --autoyes          [experimental] If enabled, all instances will automatically accept prompts, even while you've exited the app.
   -h, --help             help for claude-squad
-  -p, --program string   Program to run in new instances (e.g. 'aider --model ollama_chat/gemma3:1b')
+  -p, --program string   Program to run in new instances (e.g. 'aider --model sonnet --api-key anthropic=XXX')
       --reset            Reset all stored instances
 ```
 
@@ -66,42 +58,31 @@ To use a specific AI assistant program:
 claude-squad -p "aider --model ollama_chat/gemma3:1b"
 ```
 
-<br />
+#### Menu
+The menu at the bottom of the screen shows available commands: 
 
-### Menu Options
-
-The menu at the bottom of the screen shows available commands:
-
-#### Instance Management
+##### Instance/Session Management
 - `n` - Create a new session
 - `d` - Kill (delete) the selected session
-
-#### Actions
 - `↑/j`, `↓/k` - Navigate between sessions
-- `⏎/o` - Attach to the selected session
-- `s` - Submit/commit changes to git
-- `p` - Pause session (preserves branch, removes worktree)
-- `r` - Resume paused session
 
-#### System
-- `tab` - Switch preview tab
+##### Actions
+- `⏎/o` - Attach to the selected session to reprompt
+- `ctrl-q` - Detach from session
+- `s` - Commit and push branch to github
+- `c` - Checkout. Commits changes and pauses the session
+- `r` - Resume a paused session
+
+##### Navigation
+- `tab` - Switch between preview tab and diff tab
 - `q` - Quit the application
+- `shift-↓/↑` - scroll in diff view
 
-<br />
-
-### Session States
+#### Session States
 
 - **Running** - Claude is actively working
 - **Ready** - Claude is waiting for input
-- **Loading** - Session is starting up
-- **Paused** - Session is paused (worktree removed, branch preserved)
-
-## How It Works
-
-Claude Squad uses:
-1. **tmux** to create isolated terminal sessions for each Claude instance
-2. **git worktrees** to isolate codebases so each session works on its own branch
-3. A simple TUI interface for easy navigation and management
+- **Paused** - Session is paused so you can checkout the branch to review changes. 
 
 When you create a new session:
 1. A new git branch is created for your session
@@ -112,13 +93,19 @@ When you pause a session:
 1. Changes are committed to the branch
 2. The tmux session is closed
 3. The worktree is removed (but the branch is preserved)
-4. Branch name is copied to clipboard for reference
+4. Branch name is copied to clipboard for you to checkout
 
 When you resume a session:
-1. The worktree is recreated from the preserved branch
+1. The worktree is recreated from the preserved branch (you cannot have the branch checked out to do this)
 2. A new tmux session is launched with your AI assistant
 3. You can continue from where you left off
 
-## License
+### How It Works
+
+1. **tmux** to create isolated terminal sessions for each agent
+2. **git worktrees** to isolate codebases so each session works on its own branch
+3. A simple TUI interface for easy navigation and management
+
+### License
 
 [AGPL-3.0](LICENSE.md)
