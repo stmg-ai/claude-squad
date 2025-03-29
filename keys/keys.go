@@ -69,7 +69,7 @@ var GlobalkeyBindings = map[KeyName]key.Binding{
 	),
 	KeyEnter: key.NewBinding(
 		key.WithKeys("enter", "o"),
-		key.WithHelp("⏎/o", "open"),
+		key.WithHelp("↵/o", "open"),
 	),
 	KeyNew: key.NewBinding(
 		key.WithKeys("n"),
