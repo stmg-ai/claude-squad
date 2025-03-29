@@ -30,6 +30,7 @@ type TmuxSession struct {
 	// The name of the tmux session and the sanitized name used for tmux commands.
 	Name          string
 	sanitizedName string
+	program       string
 
 	// Initialized by Start or Restore
 	//
@@ -61,10 +62,11 @@ func toClaudeSquadTmuxName(str string) string {
 	return fmt.Sprintf("%s%s", TmuxPrefix, re.ReplaceAllString(str, ""))
 }
 
-func NewTmuxSession(name string) *TmuxSession {
+func NewTmuxSession(name string, program string) *TmuxSession {
 	return &TmuxSession{
 		Name:          name,
 		sanitizedName: toClaudeSquadTmuxName(name),
+		program:       program,
 	}
 }
 
@@ -116,7 +118,7 @@ func (t *TmuxSession) Start(program string, workDir string) error {
 		return fmt.Errorf("error restoring tmux session: %w", err)
 	}
 
-	if program == ProgramClaude || strings.Contains(program, ProgramAider) {
+	if program == ProgramClaude || strings.HasPrefix(program, ProgramAider) {
 		searchString := "Do you trust the files in this folder?"
 		tapFunc := t.TapEnter
 		iterations := 5
@@ -195,7 +197,7 @@ func (t *TmuxSession) SendKeys(keys string) error {
 }
 
 // HasUpdated checks if the tmux pane content has changed since the last tick. It also returns true if
-// the tmux pane has a prompt ("Do you want to ...").
+// the tmux pane has a prompt for aider or claude code.
 func (t *TmuxSession) HasUpdated() (updated bool, hasPrompt bool) {
 	content, err := t.CapturePaneContent()
 	if err != nil {
@@ -203,7 +205,12 @@ func (t *TmuxSession) HasUpdated() (updated bool, hasPrompt bool) {
 		return false, false
 	}
 
-	hasPrompt = strings.Contains(content, "Do you want")
+	// Only set hasPrompt for claude and aider. Use these strings to check for a prompt.
+	if t.program == ProgramClaude {
+		hasPrompt = strings.Contains(content, "Yes, and don't ask again this session")
+	} else if strings.HasPrefix(t.program, ProgramAider) {
+		hasPrompt = strings.Contains(content, "(Y)es/(N)o/(D)on't ask again")
+	}
 
 	if !bytes.Equal(t.monitor.hash(content), t.monitor.prevOutputHash) {
 		t.monitor.prevOutputHash = t.monitor.hash(content)
