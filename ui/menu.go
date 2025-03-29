@@ -144,7 +144,6 @@ func (m *Menu) SetSize(width, height int) {
 }
 
 func (m *Menu) String() string {
-	var s strings.Builder
 
 	// Define group boundaries
 	groups := []struct {
@@ -156,49 +155,97 @@ func (m *Menu) String() string {
 		{5, 7}, // System group (tab, q)
 	}
 
+	if m.isInDiffTab {
+		groups = append(groups, struct{ start, end int }{7, 9}) // Navigation group (scroll up/down)
+	}
+
+	var actionKeys []keys.KeyName
+	var nonActionKeys []keys.KeyName
 	for i, k := range m.options {
-		binding := keys.GlobalkeyBindings[k]
-
-		var (
-			localActionStyle = actionGroupStyle
-			localKeyStyle    = keyStyle
-			localDescStyle   = descStyle
-		)
-		if m.keyDown == k {
-			localActionStyle = localActionStyle.Underline(true)
-			localKeyStyle = localKeyStyle.Underline(true)
-			localDescStyle = localDescStyle.Underline(true)
-		}
-
-		// Check if we're in the action group (middle group)
 		inActionGroup := i >= groups[1].start && i < groups[1].end
-
 		if inActionGroup {
-			s.WriteString(localActionStyle.Render(binding.Help().Key))
-			s.WriteString(" ")
-			s.WriteString(localActionStyle.Render(binding.Help().Desc))
+			actionKeys = append(actionKeys, k)
 		} else {
-			s.WriteString(localKeyStyle.Render(binding.Help().Key))
-			s.WriteString(" ")
-			s.WriteString(localDescStyle.Render(binding.Help().Desc))
-		}
-
-		// Add appropriate separator
-		if i != len(m.options)-1 {
-			isGroupEnd := false
-			for _, group := range groups {
-				if i == group.end-1 {
-					s.WriteString(sepStyle.Render(verticalSeparator))
-					isGroupEnd = true
-					break
-				}
-			}
-			if !isGroupEnd {
-				s.WriteString(sepStyle.Render(separator))
-			}
+			nonActionKeys = append(nonActionKeys, k)
 		}
 	}
 
-	centeredMenuText := menuStyle.Render(s.String())
-	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, centeredMenuText)
+	var actionLine strings.Builder
+	for i, k := range actionKeys {
+		binding := keys.GlobalkeyBindings[k]
+		localActionStyle := actionGroupStyle
+		if m.keyDown == k {
+			localActionStyle = localActionStyle.Underline(true)
+		}
+		actionLine.WriteString(localActionStyle.Render(binding.Help().Key))
+		actionLine.WriteString(" ")
+		actionLine.WriteString(localActionStyle.Render(binding.Help().Desc))
+		if i != len(actionKeys)-1 {
+			actionLine.WriteString(sepStyle.Render(separator))
+		}
+	}
+	var nonActionLine strings.Builder
+	for i, k := range nonActionKeys {
+		binding := keys.GlobalkeyBindings[k]
+		localKeyStyle := keyStyle
+		localDescStyle := descStyle
+		if m.keyDown == k {
+			localKeyStyle = localKeyStyle.Underline(true)
+			localDescStyle = localDescStyle.Underline(true)
+		}
+		nonActionLine.WriteString(localKeyStyle.Render(binding.Help().Key))
+		nonActionLine.WriteString(" ")
+		nonActionLine.WriteString(localDescStyle.Render(binding.Help().Desc))
+		if i != len(nonActionKeys)-1 {
+			nonActionLine.WriteString(sepStyle.Render(separator))
+		}
+	}
+
+	//var s strings.Builder
+	//for i, k := range m.options {
+	//	binding := keys.GlobalkeyBindings[k]
+	//
+	//	var (
+	//		localActionStyle = actionGroupStyle
+	//		localKeyStyle    = keyStyle
+	//		localDescStyle   = descStyle
+	//	)
+	//	if m.keyDown == k {
+	//		localActionStyle = localActionStyle.Underline(true)
+	//		localKeyStyle = localKeyStyle.Underline(true)
+	//		localDescStyle = localDescStyle.Underline(true)
+	//	}
+	//
+	//	// Check if we're in the action group (middle group)
+	//	inActionGroup := i >= groups[1].start && i < groups[1].end
+	//
+	//	if inActionGroup {
+	//		s.WriteString(localActionStyle.Render(binding.Help().Key))
+	//		s.WriteString(" ")
+	//		s.WriteString(localActionStyle.Render(binding.Help().Desc))
+	//	} else {
+	//		s.WriteString(localKeyStyle.Render(binding.Help().Key))
+	//		s.WriteString(" ")
+	//		s.WriteString(localDescStyle.Render(binding.Help().Desc))
+	//	}
+	//
+	//	// Add appropriate separator
+	//	if i != len(m.options)-1 {
+	//		isGroupEnd := false
+	//		for _, group := range groups {
+	//			if i == group.end-1 {
+	//				s.WriteString(sepStyle.Render(verticalSeparator))
+	//				isGroupEnd = true
+	//				break
+	//			}
+	//		}
+	//		if !isGroupEnd {
+	//			s.WriteString(sepStyle.Render(separator))
+	//		}
+	//	}
+	//}
+
+	//centeredMenuText := menuStyle.Render(s.String())
+	menuContent := lipgloss.JoinVertical(lipgloss.Center, actionLine.String(), "", nonActionLine.String())
+	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, menuContent)
 }
