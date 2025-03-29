@@ -10,9 +10,9 @@ import (
 )
 
 var (
-	AdditionStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#22c55e"))
-	DeletionStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#ef4444"))
-	HunkStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("#0ea5e9"))
+	AdditionStyle = lipgloss.NewStyle().Foreground(DiffGreen)
+	DeletionStyle = lipgloss.NewStyle().Foreground(DiffRed)
+	HunkStyle     = lipgloss.NewStyle().Foreground(DiffBlue)
 )
 
 type DiffPane struct {
