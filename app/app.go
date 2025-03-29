@@ -121,7 +121,8 @@ func (m *home) updateHandleWindowSizeEvent(msg tea.WindowSizeMsg) {
 
 	// Menu takes 10% of height, list and window take 90%
 	contentHeight := int(float32(msg.Height) * 0.9)
-	menuHeight := msg.Height - contentHeight
+	menuHeight := msg.Height - contentHeight - 1 // minus 1 for error box
+	m.errBox.SetSize(msg.Width, 1)               // error box takes 1 row
 
 	m.tabbedWindow.SetSize(tabsWidth, contentHeight)
 	m.list.SetSize(listWidth, contentHeight)
