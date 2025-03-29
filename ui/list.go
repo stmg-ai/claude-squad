@@ -48,8 +48,9 @@ var mainTitle = lipgloss.NewStyle().
 	Background(lipgloss.Color("62")).
 	Foreground(lipgloss.Color("230"))
 
-var autoYes = lipgloss.NewStyle().
-	Foreground(lipgloss.AdaptiveColor{Light: "#1a1a1a", Dark: "#dddddd"})
+var autoYesStyle = lipgloss.NewStyle().
+	Background(lipgloss.Color("#dde4f0")).
+	Foreground(lipgloss.Color("#1a1a1a"))
 
 type List struct {
 	items         []*session.Instance
@@ -222,17 +223,29 @@ func (r *InstanceRenderer) Render(i *session.Instance, idx int, selected bool, h
 }
 
 func (l *List) String() string {
+	const titleText = " Instances "
+	const autoYesText = " auto-yes "
+
 	// Write the title.
-	titleItems := []string{
-		mainTitle.Render("  Instances  "),
-	}
-	if l.autoyes {
-		titleItems = append(titleItems, autoYes.Render("(auto-yes mode)"))
-	}
 	var b strings.Builder
 	b.WriteString("\n")
-	b.WriteString(lipgloss.Place(
-		l.width, 2, lipgloss.Left, lipgloss.Bottom, strings.Join(titleItems, " ")))
+	b.WriteString("\n")
+
+	// Write title line
+	// add padding of 2 because the border on list items adds some extra characters
+	titleWidth := AdjustPreviewWidth(l.width) + 2
+	if !l.autoyes {
+		b.WriteString(lipgloss.Place(
+			titleWidth, 1, lipgloss.Left, lipgloss.Bottom, mainTitle.Render(titleText)))
+	} else {
+		title := lipgloss.Place(
+			titleWidth/2, 1, lipgloss.Left, lipgloss.Bottom, mainTitle.Render(titleText))
+		autoYes := lipgloss.Place(
+			titleWidth-(titleWidth/2), 1, lipgloss.Right, lipgloss.Bottom, autoYesStyle.Render(autoYesText))
+		b.WriteString(lipgloss.JoinHorizontal(
+			lipgloss.Top, title, autoYes))
+	}
+
 	b.WriteString("\n")
 	b.WriteString("\n")
 
