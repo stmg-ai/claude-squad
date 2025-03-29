@@ -1,3 +1,4 @@
+// Package tmux provides functionality for managing tmux sessions for claude-squad
 package tmux
 
 import (

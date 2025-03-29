@@ -1,3 +1,5 @@
+// main package is the entry point for the claude-squad application,
+// providing CLI commands for session management and configuration
 package main
 
 import (

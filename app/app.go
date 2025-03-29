@@ -1,3 +1,5 @@
+// Package app implements the main application UI and logic for claude-squad,
+// managing the TUI (Text User Interface), session instances, and user interactions
 package app
 
 import (
