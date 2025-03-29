@@ -26,8 +26,8 @@ var sepStyle = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{
 
 var actionGroupStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("99"))
 
-var separator = "  •  "
-var verticalSeparator = "  │  "
+var separator = " • "
+var verticalSeparator = " │ "
 
 var menuStyle = lipgloss.NewStyle().
 	Foreground(lipgloss.Color("205"))
@@ -119,12 +119,12 @@ func (m *Menu) addInstanceOptions() {
 	if m.instance.Status == session.Paused {
 		actionGroup = append(actionGroup, keys.KeyResume)
 	} else {
-		actionGroup = append(actionGroup, keys.KeyPause)
+		actionGroup = append(actionGroup, keys.KeyCheckout)
 	}
 
 	// Navigation group (when in diff tab)
 	if m.isInDiffTab {
-		actionGroup = append(actionGroup, keys.KeyShiftUp, keys.KeyShiftDown)
+		actionGroup = append(actionGroup, keys.KeyShiftUp)
 	}
 
 	// System group

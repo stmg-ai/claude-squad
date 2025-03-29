@@ -223,19 +223,19 @@ func (m *home) handleKeyPress(msg tea.KeyMsg) (mod tea.Model, cmd tea.Cmd) {
 	// Handle menu highlighting when you press a button. We intercept it here and immediately return to
 	// update the ui while re-sending the keypress. Then, on the next call to this, we actually handle the keypress.
 	if !m.keySent && m.state != statePrompt {
-		m.keySent = true
 		// If it's in the global keymap, we should try to highlight it.
 		name, ok := keys.GlobalKeyStringsMap[msg.String()]
-		if !ok {
-			return m, func() tea.Msg { return msg }
+		// Skip the menu highlighting if the key is not in the map or we are using the shift up and down keys.
+		if ok && name != keys.KeyShiftDown && name != keys.KeyShiftUp {
+			m.keySent = true
+			// TODO: cleanup: when you press enter on stateNew, we use keys.KeySubmitName. We should unify the keymap.
+			if name == keys.KeyEnter && m.state == stateNew {
+				name = keys.KeySubmitName
+			}
+			return m, tea.Batch(
+				func() tea.Msg { return msg },
+				m.keydownCallback(name))
 		}
-		// TODO: cleanup: when you press enter on stateNew, we use keys.KeySubmitName. We should unify the keymap.
-		if name == keys.KeyEnter && m.state == stateNew {
-			name = keys.KeySubmitName
-		}
-		return m, tea.Batch(
-			func() tea.Msg { return msg },
-			m.keydownCallback(name))
 	}
 	m.keySent = false
 	if m.state == stateNew {
@@ -448,7 +448,7 @@ func (m *home) handleKeyPress(msg tea.KeyMsg) (mod tea.Model, cmd tea.Cmd) {
 		}
 
 		return m, nil
-	case keys.KeyPause:
+	case keys.KeyCheckout:
 		selected := m.list.GetSelectedInstance()
 		if selected == nil {
 			return m, nil
